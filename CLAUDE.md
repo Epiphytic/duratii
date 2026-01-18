@@ -364,41 +364,41 @@ wrangler deploy
 
 ### Phase 1: Core Infrastructure (Current - Scaffold Complete)
 
-| Task | Status | Notes |
-|------|--------|-------|
-| Project scaffold with worker-rs 0.7 | ✅ Done | Compiles successfully |
-| Router with all route stubs | ✅ Done | See `src/lib.rs` |
-| GitHub OAuth flow | ✅ Done | Cookie-based sessions |
-| Auth middleware | ✅ Done | Session validation |
-| UserHub Durable Object | ✅ Done | RefCell for interior mutability |
-| HTMX templates (inline) | ✅ Done | Dark theme dashboard |
-| D1 schema | ✅ Done | `schema.sql` |
-| wrangler.toml config | ✅ Done | DO, D1, R2 bindings |
+| Task                                | Status  | Notes                           |
+| ----------------------------------- | ------- | ------------------------------- |
+| Project scaffold with worker-rs 0.7 | ✅ Done | Compiles successfully           |
+| Router with all route stubs         | ✅ Done | See `src/lib.rs`                |
+| GitHub OAuth flow                   | ✅ Done | Cookie-based sessions           |
+| Auth middleware                     | ✅ Done | Session validation              |
+| UserHub Durable Object              | ✅ Done | RefCell for interior mutability |
+| HTMX templates (inline)             | ✅ Done | Dark theme dashboard            |
+| D1 schema                           | ✅ Done | `schema.sql`                    |
+| wrangler.toml config                | ✅ Done | DO, D1, R2 bindings             |
 
 ### Phase 2: Orchestrator Backend Completion
 
-| Task | Priority | Description |
-|------|----------|-------------|
-| **WebSocket hibernation handlers** | P0 | Implement `websocket_message`, `websocket_close`, `websocket_error` trait methods in UserHub for hibernation API |
-| **D1 integration for sessions** | P1 | Replace cookie-based sessions with D1 storage for security and revocation |
-| **Client persistence in DO SQLite** | P1 | Store client registry in DO's built-in SQLite for crash recovery |
-| **Token generation for clients** | P1 | Generate secure tokens for claudecodeui to authenticate with |
-| **API for token management** | P1 | `/api/tokens` - create, list, revoke client connection tokens |
-| **Rate limiting** | P2 | Use KV to track WebSocket connection attempts per IP |
-| **Health check with metrics** | P2 | Return connected client count, DO status |
-| **Error handling improvements** | P2 | Consistent error responses, logging |
+| Task                                | Priority | Description                                                                                                      |
+| ----------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| **WebSocket hibernation handlers**  | P0       | Implement `websocket_message`, `websocket_close`, `websocket_error` trait methods in UserHub for hibernation API |
+| **D1 integration for sessions**     | P1       | Replace cookie-based sessions with D1 storage for security and revocation                                        |
+| **Client persistence in DO SQLite** | P1       | Store client registry in DO's built-in SQLite for crash recovery                                                 |
+| **Token generation for clients**    | P1       | Generate secure tokens for claudecodeui to authenticate with                                                     |
+| **API for token management**        | P1       | `/api/tokens` - create, list, revoke client connection tokens                                                    |
+| **Rate limiting**                   | P2       | Use KV to track WebSocket connection attempts per IP                                                             |
+| **Health check with metrics**       | P2       | Return connected client count, DO status                                                                         |
+| **Error handling improvements**     | P2       | Consistent error responses, logging                                                                              |
 
 ### Phase 3: Dashboard UI Enhancements
 
-| Task | Priority | Description |
-|------|----------|-------------|
-| **Client detail view** | P1 | Expandable card showing full project path, connection time, activity log |
-| **Client actions** | P1 | Disconnect client, view logs, send commands |
-| **Real-time status updates** | P1 | WebSocket → HTMX swap for live status changes |
-| **Token management UI** | P1 | Generate/revoke tokens from dashboard |
-| **Notification badges** | P2 | Show count of active/busy clients |
-| **Mobile responsive layout** | P2 | CSS adjustments for small screens |
-| **Keyboard shortcuts** | P3 | Navigate between clients, quick actions |
+| Task                         | Priority | Description                                                              |
+| ---------------------------- | -------- | ------------------------------------------------------------------------ |
+| **Client detail view**       | P1       | Expandable card showing full project path, connection time, activity log |
+| **Client actions**           | P1       | Disconnect client, view logs, send commands                              |
+| **Real-time status updates** | P1       | WebSocket → HTMX swap for live status changes                            |
+| **Token management UI**      | P1       | Generate/revoke tokens from dashboard                                    |
+| **Notification badges**      | P2       | Show count of active/busy clients                                        |
+| **Mobile responsive layout** | P2       | CSS adjustments for small screens                                        |
+| **Keyboard shortcuts**       | P3       | Navigate between clients, quick actions                                  |
 
 ### Phase 4: claudecodeui Modifications
 
@@ -421,12 +421,12 @@ claudecodeui needs modifications to connect back to the orchestrator. These chan
 
 #### 4.2 Connection Manager
 
-| Task | File | Description |
-|------|------|-------------|
-| **OrchestratorClient class** | `src/orchestrator.ts` | WebSocket client with auto-reconnect |
-| **Status reporter** | `src/orchestrator.ts` | Report idle/active/busy status changes |
-| **Heartbeat handler** | `src/orchestrator.ts` | Send ping, handle pong, detect disconnection |
-| **Graceful degradation** | `src/orchestrator.ts` | Continue working if orchestrator unavailable |
+| Task                         | File                  | Description                                  |
+| ---------------------------- | --------------------- | -------------------------------------------- |
+| **OrchestratorClient class** | `src/orchestrator.ts` | WebSocket client with auto-reconnect         |
+| **Status reporter**          | `src/orchestrator.ts` | Report idle/active/busy status changes       |
+| **Heartbeat handler**        | `src/orchestrator.ts` | Send ping, handle pong, detect disconnection |
+| **Graceful degradation**     | `src/orchestrator.ts` | Continue working if orchestrator unavailable |
 
 #### 4.3 Message Protocol (claudecodeui → Orchestrator)
 
@@ -434,13 +434,13 @@ claudecodeui needs modifications to connect back to the orchestrator. These chan
 // Messages sent by claudecodeui
 interface RegisterMessage {
   type: "register";
-  client_id: string;      // Unique per instance (hostname + process ID)
-  user_token: string;     // Token from orchestrator dashboard
+  client_id: string; // Unique per instance (hostname + process ID)
+  user_token: string; // Token from orchestrator dashboard
   metadata: {
     hostname: string;
-    project: string;      // Current working directory
+    project: string; // Current working directory
     status: "idle" | "active" | "busy";
-    version: string;      // claudecodeui version
+    version: string; // claudecodeui version
   };
 }
 
@@ -478,38 +478,38 @@ interface ErrorMessage {
 
 #### 4.5 Implementation Tasks
 
-| Task | Priority | Description |
-|------|----------|-------------|
-| **Add orchestrator config schema** | P0 | JSON schema for config validation |
-| **Create OrchestratorClient** | P0 | WebSocket connection with reconnect logic |
-| **Hook into status changes** | P0 | Detect when Claude is thinking/responding |
-| **Add CLI flag for token** | P1 | `--orchestrator-token` for headless setups |
-| **Environment variable support** | P1 | `ORCHESTRATOR_URL`, `ORCHESTRATOR_TOKEN` |
-| **Connection status indicator** | P2 | Show connected/disconnected in UI |
-| **Handle disconnect command** | P2 | Clean shutdown when orchestrator requests |
+| Task                               | Priority | Description                                |
+| ---------------------------------- | -------- | ------------------------------------------ |
+| **Add orchestrator config schema** | P0       | JSON schema for config validation          |
+| **Create OrchestratorClient**      | P0       | WebSocket connection with reconnect logic  |
+| **Hook into status changes**       | P0       | Detect when Claude is thinking/responding  |
+| **Add CLI flag for token**         | P1       | `--orchestrator-token` for headless setups |
+| **Environment variable support**   | P1       | `ORCHESTRATOR_URL`, `ORCHESTRATOR_TOKEN`   |
+| **Connection status indicator**    | P2       | Show connected/disconnected in UI          |
+| **Handle disconnect command**      | P2       | Clean shutdown when orchestrator requests  |
 
 ### Phase 5: Deployment & Operations
 
-| Task | Priority | Description |
-|------|----------|-------------|
-| **Create GitHub App** | P0 | OAuth credentials, callback URLs |
-| **Deploy to Cloudflare** | P0 | Initial deployment with wrangler |
-| **Set up custom domain** | P1 | DNS, SSL certificate |
-| **Create staging environment** | P1 | Separate D1, different allowed users |
-| **Monitoring & alerts** | P2 | Cloudflare analytics, error tracking |
-| **Backup strategy for D1** | P2 | Regular exports of user/session data |
-| **Documentation** | P2 | Setup guide, API docs, troubleshooting |
+| Task                           | Priority | Description                            |
+| ------------------------------ | -------- | -------------------------------------- |
+| **Create GitHub App**          | P0       | OAuth credentials, callback URLs       |
+| **Deploy to Cloudflare**       | P0       | Initial deployment with wrangler       |
+| **Set up custom domain**       | P1       | DNS, SSL certificate                   |
+| **Create staging environment** | P1       | Separate D1, different allowed users   |
+| **Monitoring & alerts**        | P2       | Cloudflare analytics, error tracking   |
+| **Backup strategy for D1**     | P2       | Regular exports of user/session data   |
+| **Documentation**              | P2       | Setup guide, API docs, troubleshooting |
 
 ### Phase 6: Future Enhancements
 
-| Feature | Description |
-|---------|-------------|
-| **Multi-user workspaces** | Share client visibility with team members |
-| **Command relay** | Send commands to claudecodeui instances from dashboard |
-| **Activity timeline** | Historical view of client activity |
-| **Webhooks** | Notify external systems of status changes |
-| **Mobile app** | Native iOS/Android for quick status checks |
-| **CLI tool** | `orchestrator-cli` for scripted management |
+| Feature                   | Description                                            |
+| ------------------------- | ------------------------------------------------------ |
+| **Multi-user workspaces** | Share client visibility with team members              |
+| **Command relay**         | Send commands to claudecodeui instances from dashboard |
+| **Activity timeline**     | Historical view of client activity                     |
+| **Webhooks**              | Notify external systems of status changes              |
+| **Mobile app**            | Native iOS/Android for quick status checks             |
+| **CLI tool**              | `orchestrator-cli` for scripted management             |
 
 ---
 
