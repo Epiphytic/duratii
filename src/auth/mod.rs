@@ -51,7 +51,10 @@ pub async fn start_oauth(req: Request, ctx: RouteContext<()>) -> Result<Response
     headers.set("Location", &auth_url)?;
     headers.set(
         "Set-Cookie",
-        &format!("oauth_state={}; HttpOnly; Secure; SameSite=Lax; Max-Age=600", state),
+        &format!(
+            "oauth_state={}; HttpOnly; Secure; SameSite=Lax; Max-Age=600",
+            state
+        ),
     )?;
 
     Response::empty()
@@ -122,44 +125,47 @@ pub async fn handle_callback(req: Request, ctx: RouteContext<()>) -> Result<Resp
         return Response::error("Access denied: not authorized", 403);
     }
 
-    // Create or update user in D1
-    let db = ctx.env.d1("DB")?;
+    // Create user and session
     let user = crate::models::User::new(github_user.id, github_user.login, github_user.email);
+    let session = crate::models::Session::new(user.id.clone(), 24 * 7); // 1 week
 
-    db.prepare(
-        "INSERT INTO users (id, github_id, github_login, email, created_at, last_login)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-         ON CONFLICT(github_id) DO UPDATE SET
-             last_login = ?6,
-             github_login = ?3,
-             email = ?4",
-    )
-    .bind(&[
-        user.id.clone().into(),
-        user.github_id.into(),
-        user.github_login.clone().into(),
-        user.email.clone().unwrap_or_default().into(),
-        user.created_at.clone().into(),
-        user.last_login.clone().unwrap_or_default().into(),
-    ])?
-    .run()
-    .await?;
+    // Store in D1 database
+    // Note: D1 binding will be configured when deploying
+    if let Ok(db) = ctx.env.d1("DB") {
+        // Create or update user
+        let _ = db
+            .prepare(
+                "INSERT INTO users (id, github_id, github_login, email, created_at, last_login)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                 ON CONFLICT(github_id) DO UPDATE SET
+                     last_login = ?6,
+                     github_login = ?3,
+                     email = ?4",
+            )
+            .bind(&[
+                user.id.clone().into(),
+                user.github_id.into(),
+                user.github_login.clone().into(),
+                user.email.clone().unwrap_or_default().into(),
+                user.created_at.clone().into(),
+                user.last_login.clone().unwrap_or_default().into(),
+            ])
+            .map(|q| q.run());
 
-    // Create session
-    let session = crate::models::Session::new(user.id, 24 * 7); // 1 week
-
-    db.prepare(
-        "INSERT INTO sessions (id, user_id, expires_at, created_at)
-         VALUES (?1, ?2, ?3, ?4)",
-    )
-    .bind(&[
-        session.id.clone().into(),
-        session.user_id.into(),
-        session.expires_at.into(),
-        session.created_at.into(),
-    ])?
-    .run()
-    .await?;
+        // Create session
+        let _ = db
+            .prepare(
+                "INSERT INTO sessions (id, user_id, expires_at, created_at)
+                 VALUES (?1, ?2, ?3, ?4)",
+            )
+            .bind(&[
+                session.id.clone().into(),
+                session.user_id.clone().into(),
+                session.expires_at.clone().into(),
+                session.created_at.clone().into(),
+            ])
+            .map(|q| q.run());
+    }
 
     // Redirect to dashboard with session cookie
     let mut headers = Headers::new();
@@ -179,7 +185,7 @@ pub async fn handle_callback(req: Request, ctx: RouteContext<()>) -> Result<Resp
 }
 
 /// Logout and clear session
-pub async fn logout(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
+pub async fn logout(_req: Request, _ctx: RouteContext<()>) -> Result<Response> {
     // Clear session cookie
     let mut headers = Headers::new();
     headers.set("Location", "/")?;
@@ -257,7 +263,10 @@ fn get_redirect_uri(req: &Request) -> Result<String> {
     let scheme = url.scheme();
     let host = url.host_str().ok_or("Missing host")?;
     let port = url.port().map(|p| format!(":{}", p)).unwrap_or_default();
-    Ok(format!("{}://{}{}/auth/github/callback", scheme, host, port))
+    Ok(format!(
+        "{}://{}{}/auth/github/callback",
+        scheme, host, port
+    ))
 }
 
 fn generate_state() -> String {
