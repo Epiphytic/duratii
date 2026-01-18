@@ -33,7 +33,7 @@ pub async fn serve_static(_req: Request, ctx: RouteContext<()>) -> Result<Respon
             let bytes = body.bytes().await?;
 
             let content_type = guess_content_type(&path);
-            let mut headers = Headers::new();
+            let headers = Headers::new();
             headers.set("Content-Type", content_type)?;
             headers.set("Cache-Control", "public, max-age=31536000")?;
 
