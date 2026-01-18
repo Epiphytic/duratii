@@ -67,10 +67,12 @@ impl DurableObject for UserHub {
         let path = url.path();
 
         // Route based on path
-        match path.as_str() {
-            "/ws" => self.handle_websocket(req).await,
-            "/clients" => self.get_clients_json().await,
-            _ => Response::error("Not found", 404),
+        if path == "/ws" {
+            self.handle_websocket(req).await
+        } else if path == "/clients" {
+            self.get_clients_json().await
+        } else {
+            Response::error("Not found", 404)
         }
     }
 
@@ -85,7 +87,7 @@ impl DurableObject for UserHub {
             }
             WebSocketIncomingMessage::Binary(_) => {
                 // Binary messages not supported
-                ws.send_with_str(r#"{"type":"error","message":"Binary messages not supported"}"#)?;
+                let _ = ws.send_with_str(r#"{"type":"error","message":"Binary messages not supported"}"#);
             }
         }
         Ok(())
@@ -115,8 +117,9 @@ impl DurableObject for UserHub {
             self.remove_client_from_storage(&client_id).await?;
 
             // Broadcast disconnection to browsers
-            let msg = serde_json::to_string(&WsMessage::ClientDisconnected { client_id })?;
-            self.broadcast_to_browsers(&msg);
+            if let Ok(msg) = serde_json::to_string(&WsMessage::ClientDisconnected { client_id }) {
+                self.broadcast_to_browsers(&msg);
+            }
         }
 
         Ok(())
@@ -131,7 +134,7 @@ impl DurableObject for UserHub {
 }
 
 impl UserHub {
-    async fn handle_websocket(&mut self, req: Request) -> Result<Response> {
+    async fn handle_websocket(&mut self, _req: Request) -> Result<Response> {
         let pair = WebSocketPair::new()?;
         let server = pair.server;
         let client = pair.client;
@@ -139,16 +142,8 @@ impl UserHub {
         // Accept the connection
         server.accept()?;
 
-        // Determine if this is a browser or claudecodeui based on query params
-        let url = req.url()?;
-        let is_browser = url
-            .query_pairs()
-            .any(|(k, v)| k == "type" && v == "browser");
-
-        if is_browser {
-            self.browsers.push(server);
-        }
-        // claudecodeui connections will register themselves via message
+        // All connections start as potential claudecodeui clients
+        // Browser connections will identify themselves via message
 
         Response::from_websocket(client)
     }
@@ -160,7 +155,9 @@ impl UserHub {
                 let error = WsMessage::Error {
                     message: format!("Invalid message format: {}", e),
                 };
-                ws.send_with_str(&serde_json::to_string(&error)?)?;
+                if let Ok(json) = serde_json::to_string(&error) {
+                    let _ = ws.send_with_str(&json);
+                }
                 return Ok(());
             }
         };
@@ -175,36 +172,42 @@ impl UserHub {
                 let user_id = self.state.id().to_string();
                 let client = Client::new(client_id.clone(), user_id, metadata);
 
-                // Store connection
-                self.clients.insert(
-                    client_id.clone(),
-                    ClientConnection {
-                        websocket: ws.clone(),
-                        client: client.clone(),
-                    },
-                );
-
-                // Persist to SQLite
+                // Persist to SQLite first
                 self.save_client_to_storage(&client).await?;
 
                 // Broadcast update to browsers
-                let update = WsMessage::ClientUpdate { client };
-                self.broadcast_to_browsers(&serde_json::to_string(&update)?);
+                if let Ok(json) = serde_json::to_string(&WsMessage::ClientUpdate {
+                    client: client.clone(),
+                }) {
+                    self.broadcast_to_browsers(&json);
+                }
+
+                // Store connection
+                self.clients.insert(
+                    client_id,
+                    ClientConnection {
+                        websocket: ws.clone(),
+                        client,
+                    },
+                );
             }
 
             WsMessage::StatusUpdate { client_id, status } => {
+                // Get client, update, and extract data before persisting
                 if let Some(conn) = self.clients.get_mut(&client_id) {
                     conn.client.update_status(status);
                     conn.client.update_last_seen();
+                    let client_clone = conn.client.clone();
 
                     // Persist update
-                    self.save_client_to_storage(&conn.client).await?;
+                    self.save_client_to_storage(&client_clone).await?;
 
                     // Broadcast to browsers
-                    let update = WsMessage::ClientUpdate {
-                        client: conn.client.clone(),
-                    };
-                    self.broadcast_to_browsers(&serde_json::to_string(&update)?);
+                    if let Ok(json) =
+                        serde_json::to_string(&WsMessage::ClientUpdate { client: client_clone })
+                    {
+                        self.broadcast_to_browsers(&json);
+                    }
                 }
             }
 
@@ -213,13 +216,24 @@ impl UserHub {
                     conn.client.update_last_seen();
                 }
                 let pong = WsMessage::Pong { client_id };
-                ws.send_with_str(&serde_json::to_string(&pong)?)?;
+                if let Ok(json) = serde_json::to_string(&pong) {
+                    let _ = ws.send_with_str(&json);
+                }
             }
 
             WsMessage::GetClients => {
-                let clients: Vec<Client> = self.clients.values().map(|c| c.client.clone()).collect();
+                // This is a browser requesting the client list
+                // Add it to browsers if not already there
+                if !self.browsers.contains(ws) {
+                    self.browsers.push(ws.clone());
+                }
+
+                let clients: Vec<Client> =
+                    self.clients.values().map(|c| c.client.clone()).collect();
                 let response = WsMessage::ClientList { clients };
-                ws.send_with_str(&serde_json::to_string(&response)?)?;
+                if let Ok(json) = serde_json::to_string(&response) {
+                    let _ = ws.send_with_str(&json);
+                }
             }
 
             _ => {
@@ -242,16 +256,18 @@ impl UserHub {
     }
 
     async fn save_client_to_storage(&self, client: &Client) -> Result<()> {
-        let storage = self.state.storage();
-        storage
+        self.state
+            .storage()
             .put(&format!("client:{}", client.id), client)
             .await?;
         Ok(())
     }
 
     async fn remove_client_from_storage(&self, client_id: &str) -> Result<()> {
-        let storage = self.state.storage();
-        storage.delete(&format!("client:{}", client_id)).await?;
+        self.state
+            .storage()
+            .delete(&format!("client:{}", client_id))
+            .await?;
         Ok(())
     }
 }
