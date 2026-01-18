@@ -47,7 +47,7 @@ pub async fn start_oauth(req: Request, ctx: RouteContext<()>) -> Result<Response
         state
     );
 
-    let mut headers = Headers::new();
+    let headers = Headers::new();
     headers.set("Location", &auth_url)?;
     headers.set(
         "Set-Cookie",
@@ -129,52 +129,24 @@ pub async fn handle_callback(req: Request, ctx: RouteContext<()>) -> Result<Resp
     let user = crate::models::User::new(github_user.id, github_user.login, github_user.email);
     let session = crate::models::Session::new(user.id.clone(), 24 * 7); // 1 week
 
-    // Store in D1 database
-    // Note: D1 binding will be configured when deploying
-    if let Ok(db) = ctx.env.d1("DB") {
-        // Create or update user
-        let _ = db
-            .prepare(
-                "INSERT INTO users (id, github_id, github_login, email, created_at, last_login)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-                 ON CONFLICT(github_id) DO UPDATE SET
-                     last_login = ?6,
-                     github_login = ?3,
-                     email = ?4",
-            )
-            .bind(&[
-                user.id.clone().into(),
-                user.github_id.into(),
-                user.github_login.clone().into(),
-                user.email.clone().unwrap_or_default().into(),
-                user.created_at.clone().into(),
-                user.last_login.clone().unwrap_or_default().into(),
-            ])
-            .map(|q| q.run());
-
-        // Create session
-        let _ = db
-            .prepare(
-                "INSERT INTO sessions (id, user_id, expires_at, created_at)
-                 VALUES (?1, ?2, ?3, ?4)",
-            )
-            .bind(&[
-                session.id.clone().into(),
-                session.user_id.clone().into(),
-                session.expires_at.clone().into(),
-                session.created_at.clone().into(),
-            ])
-            .map(|q| q.run());
-    }
+    // Encode user info in session cookie (simplified - production should use D1)
+    let session_data = serde_json::to_string(&SessionData {
+        session_id: session.id.clone(),
+        user_id: user.id.clone(),
+        github_login: user.github_login.clone(),
+        github_id: user.github_id,
+        expires_at: session.expires_at.clone(),
+    })?;
+    let encoded_session = base64_encode(&session_data);
 
     // Redirect to dashboard with session cookie
-    let mut headers = Headers::new();
+    let headers = Headers::new();
     headers.set("Location", "/dashboard")?;
     headers.set(
         "Set-Cookie",
         &format!(
             "session={}; HttpOnly; Secure; SameSite=Lax; Max-Age={}",
-            session.id,
+            encoded_session,
             7 * 24 * 60 * 60 // 1 week in seconds
         ),
     )?;
@@ -187,7 +159,7 @@ pub async fn handle_callback(req: Request, ctx: RouteContext<()>) -> Result<Resp
 /// Logout and clear session
 pub async fn logout(_req: Request, _ctx: RouteContext<()>) -> Result<Response> {
     // Clear session cookie
-    let mut headers = Headers::new();
+    let headers = Headers::new();
     headers.set("Location", "/")?;
     headers.set(
         "Set-Cookie",
@@ -197,6 +169,15 @@ pub async fn logout(_req: Request, _ctx: RouteContext<()>) -> Result<Response> {
     Response::empty()
         .map(|r| r.with_status(302))
         .map(|r| r.with_headers(headers))
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SessionData {
+    pub session_id: String,
+    pub user_id: String,
+    pub github_login: String,
+    pub github_id: i64,
+    pub expires_at: String,
 }
 
 async fn exchange_code_for_token(
@@ -214,7 +195,7 @@ async fn exchange_code_for_token(
     init.with_method(Method::Post);
     init.with_body(Some(wasm_bindgen::JsValue::from_str(&body)));
 
-    let mut headers = Headers::new();
+    let headers = Headers::new();
     headers.set("Accept", "application/json")?;
     headers.set("Content-Type", "application/x-www-form-urlencoded")?;
     init.with_headers(headers);
@@ -227,7 +208,7 @@ async fn exchange_code_for_token(
 }
 
 async fn get_github_user(token: &str) -> Result<GitHubUser> {
-    let mut headers = Headers::new();
+    let headers = Headers::new();
     headers.set("Authorization", &format!("Bearer {}", token))?;
     headers.set("User-Agent", "AI-Orchestrator")?;
     headers.set("Accept", "application/json")?;
@@ -242,7 +223,7 @@ async fn get_github_user(token: &str) -> Result<GitHubUser> {
 }
 
 async fn check_org_membership(token: &str, allowed_orgs: &[String]) -> Result<bool> {
-    let mut headers = Headers::new();
+    let headers = Headers::new();
     headers.set("Authorization", &format!("Bearer {}", token))?;
     headers.set("User-Agent", "AI-Orchestrator")?;
     headers.set("Accept", "application/json")?;
@@ -294,4 +275,65 @@ fn url_encode(s: &str) -> String {
             _ => format!("%{:02X}", c as u8),
         })
         .collect()
+}
+
+fn base64_encode(s: &str) -> String {
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let bytes = s.as_bytes();
+    let mut result = String::new();
+
+    for chunk in bytes.chunks(3) {
+        let b0 = chunk[0] as usize;
+        let b1 = chunk.get(1).copied().unwrap_or(0) as usize;
+        let b2 = chunk.get(2).copied().unwrap_or(0) as usize;
+
+        result.push(CHARS[b0 >> 2] as char);
+        result.push(CHARS[((b0 & 0x03) << 4) | (b1 >> 4)] as char);
+
+        if chunk.len() > 1 {
+            result.push(CHARS[((b1 & 0x0f) << 2) | (b2 >> 6)] as char);
+        } else {
+            result.push('=');
+        }
+
+        if chunk.len() > 2 {
+            result.push(CHARS[b2 & 0x3f] as char);
+        } else {
+            result.push('=');
+        }
+    }
+
+    result
+}
+
+pub fn base64_decode(s: &str) -> Result<String> {
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    fn char_to_val(c: char) -> Option<u8> {
+        CHARS.iter().position(|&b| b == c as u8).map(|i| i as u8)
+    }
+
+    let s = s.trim_end_matches('=');
+    let mut bytes = Vec::new();
+
+    for chunk in s.as_bytes().chunks(4) {
+        let vals: Vec<u8> = chunk
+            .iter()
+            .filter_map(|&b| char_to_val(b as char))
+            .collect();
+
+        if vals.is_empty() {
+            break;
+        }
+
+        bytes.push((vals[0] << 2) | (vals.get(1).unwrap_or(&0) >> 4));
+        if vals.len() > 2 {
+            bytes.push((vals[1] << 4) | (vals.get(2).unwrap_or(&0) >> 2));
+        }
+        if vals.len() > 3 {
+            bytes.push((vals[2] << 6) | vals.get(3).unwrap_or(&0));
+        }
+    }
+
+    String::from_utf8(bytes).map_err(|e| worker::Error::RustError(e.to_string()))
 }
