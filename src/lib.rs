@@ -4,6 +4,7 @@ mod auth;
 mod durable_objects;
 mod handlers;
 mod models;
+mod templates;
 
 pub use durable_objects::UserHub;
 
