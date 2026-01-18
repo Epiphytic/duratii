@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use worker::*;
 
@@ -35,21 +36,21 @@ pub enum WsMessage {
     Error { message: String },
 }
 
+struct ClientConnection {
+    websocket: WebSocket,
+    client: Client,
+}
+
 /// Per-user Durable Object that manages connected claudecodeui instances
 #[durable_object]
 pub struct UserHub {
     state: State,
     #[allow(dead_code)]
     env: Env,
-    /// Connected claudecodeui clients
-    clients: HashMap<String, ClientConnection>,
+    /// Connected claudecodeui clients (using RefCell for interior mutability)
+    clients: RefCell<HashMap<String, ClientConnection>>,
     /// Connected browser sessions (for real-time updates)
-    browsers: Vec<WebSocket>,
-}
-
-struct ClientConnection {
-    websocket: WebSocket,
-    client: Client,
+    browsers: RefCell<Vec<WebSocket>>,
 }
 
 impl DurableObject for UserHub {
@@ -57,12 +58,12 @@ impl DurableObject for UserHub {
         Self {
             state,
             env,
-            clients: HashMap::new(),
-            browsers: Vec::new(),
+            clients: RefCell::new(HashMap::new()),
+            browsers: RefCell::new(Vec::new()),
         }
     }
 
-    async fn fetch(&mut self, req: Request) -> Result<Response> {
+    async fn fetch(&self, req: Request) -> Result<Response> {
         let url = req.url()?;
         let path = url.path();
 
@@ -70,7 +71,7 @@ impl DurableObject for UserHub {
         if path == "/ws" {
             self.handle_websocket(req).await
         } else if path == "/clients" {
-            self.get_clients_json().await
+            self.get_clients_json()
         } else {
             Response::error("Not found", 404)
         }
@@ -78,7 +79,7 @@ impl DurableObject for UserHub {
 }
 
 impl UserHub {
-    async fn handle_websocket(&mut self, req: Request) -> Result<Response> {
+    async fn handle_websocket(&self, req: Request) -> Result<Response> {
         // Get the upgrade header
         let upgrade = req.headers().get("Upgrade")?;
         if upgrade.as_deref() != Some("websocket") {
@@ -98,8 +99,8 @@ impl UserHub {
         Response::from_websocket(client)
     }
 
-    pub async fn websocket_message(&mut self, ws: &WebSocket, text: String) -> Result<()> {
-        let msg: WsMessage = match serde_json::from_str(&text) {
+    fn handle_message(&self, ws: &WebSocket, text: &str) -> Result<()> {
+        let msg: WsMessage = match serde_json::from_str(text) {
             Ok(m) => m,
             Err(e) => {
                 let error = WsMessage::Error {
@@ -122,9 +123,6 @@ impl UserHub {
                 let user_id = self.state.id().to_string();
                 let client = Client::new(client_id.clone(), user_id, metadata);
 
-                // Persist to storage first
-                self.save_client_to_storage(&client).await?;
-
                 // Broadcast update to browsers
                 if let Ok(json) = serde_json::to_string(&WsMessage::ClientUpdate {
                     client: client.clone(),
@@ -133,7 +131,7 @@ impl UserHub {
                 }
 
                 // Store connection
-                self.clients.insert(
+                self.clients.borrow_mut().insert(
                     client_id,
                     ClientConnection {
                         websocket: ws.clone(),
@@ -143,26 +141,25 @@ impl UserHub {
             }
 
             WsMessage::StatusUpdate { client_id, status } => {
-                // Get client, update, and extract data before persisting
-                if let Some(conn) = self.clients.get_mut(&client_id) {
+                // Get client, update, and extract data
+                let mut clients = self.clients.borrow_mut();
+                if let Some(conn) = clients.get_mut(&client_id) {
                     conn.client.update_status(status);
                     conn.client.update_last_seen();
                     let client_clone = conn.client.clone();
-
-                    // Persist update
-                    self.save_client_to_storage(&client_clone).await?;
 
                     // Broadcast to browsers
                     if let Ok(json) =
                         serde_json::to_string(&WsMessage::ClientUpdate { client: client_clone })
                     {
+                        drop(clients); // Release borrow before broadcasting
                         self.broadcast_to_browsers(&json);
                     }
                 }
             }
 
             WsMessage::Ping { client_id } => {
-                if let Some(conn) = self.clients.get_mut(&client_id) {
+                if let Some(conn) = self.clients.borrow_mut().get_mut(&client_id) {
                     conn.client.update_last_seen();
                 }
                 let pong = WsMessage::Pong { client_id };
@@ -174,12 +171,19 @@ impl UserHub {
             WsMessage::GetClients => {
                 // This is a browser requesting the client list
                 // Add it to browsers if not already there
-                if !self.browsers.contains(ws) {
-                    self.browsers.push(ws.clone());
+                {
+                    let mut browsers = self.browsers.borrow_mut();
+                    if !browsers.contains(ws) {
+                        browsers.push(ws.clone());
+                    }
                 }
 
-                let clients: Vec<Client> =
-                    self.clients.values().map(|c| c.client.clone()).collect();
+                let clients: Vec<Client> = self
+                    .clients
+                    .borrow()
+                    .values()
+                    .map(|c| c.client.clone())
+                    .collect();
                 let response = WsMessage::ClientList { clients };
                 if let Ok(json) = serde_json::to_string(&response) {
                     let _ = ws.send_with_str(&json);
@@ -194,56 +198,44 @@ impl UserHub {
         Ok(())
     }
 
-    pub async fn websocket_close(&mut self, ws: &WebSocket) -> Result<()> {
+    fn handle_close(&self, ws: &WebSocket) {
         // Remove from browsers list
-        self.browsers.retain(|b| b != ws);
+        self.browsers.borrow_mut().retain(|b| b != ws);
 
         // Remove from clients and broadcast disconnection
-        let disconnected_id = self
-            .clients
-            .iter()
-            .find(|(_, conn)| &conn.websocket == ws)
-            .map(|(id, _)| id.clone());
+        let disconnected_id = {
+            let clients = self.clients.borrow();
+            clients
+                .iter()
+                .find(|(_, conn)| &conn.websocket == ws)
+                .map(|(id, _)| id.clone())
+        };
 
         if let Some(client_id) = disconnected_id {
-            self.clients.remove(&client_id);
-
-            // Persist removal
-            self.remove_client_from_storage(&client_id).await?;
+            self.clients.borrow_mut().remove(&client_id);
 
             // Broadcast disconnection to browsers
-            if let Ok(msg) = serde_json::to_string(&WsMessage::ClientDisconnected { client_id }) {
+            if let Ok(msg) =
+                serde_json::to_string(&WsMessage::ClientDisconnected { client_id })
+            {
                 self.broadcast_to_browsers(&msg);
             }
         }
-
-        Ok(())
     }
 
-    async fn get_clients_json(&self) -> Result<Response> {
-        let clients: Vec<Client> = self.clients.values().map(|c| c.client.clone()).collect();
+    fn get_clients_json(&self) -> Result<Response> {
+        let clients: Vec<Client> = self
+            .clients
+            .borrow()
+            .values()
+            .map(|c| c.client.clone())
+            .collect();
         Response::from_json(&clients)
     }
 
     fn broadcast_to_browsers(&self, message: &str) {
-        for browser in &self.browsers {
+        for browser in self.browsers.borrow().iter() {
             let _ = browser.send_with_str(message);
         }
-    }
-
-    async fn save_client_to_storage(&self, client: &Client) -> Result<()> {
-        self.state
-            .storage()
-            .put(&format!("client:{}", client.id), client)
-            .await?;
-        Ok(())
-    }
-
-    async fn remove_client_from_storage(&self, client_id: &str) -> Result<()> {
-        self.state
-            .storage()
-            .delete(&format!("client:{}", client_id))
-            .await?;
-        Ok(())
     }
 }
