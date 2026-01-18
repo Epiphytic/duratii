@@ -176,31 +176,59 @@ ws.send(
 );
 ```
 
-### File Structure
+### File Structure (Implemented)
 
 ```
-src/
-├── lib.rs              # Worker entry point, router
-├── auth/
-│   ├── mod.rs          # GitHub OAuth flow
-│   └── middleware.rs   # Auth middleware
-├── handlers/
-│   ├── mod.rs
-│   ├── clients.rs      # Client list HTMX endpoints
-│   ├── dashboard.rs    # Dashboard page
-│   └── websocket.rs    # WebSocket upgrade handler
-├── durable_objects/
-│   ├── mod.rs
-│   └── user_hub.rs     # Per-user client hub
-├── templates/
-│   ├── layout.html     # Base layout
-│   ├── dashboard.html  # Main dashboard
-│   ├── clients.html    # Client list partial
-│   └── client_card.html # Single client card
-└── models/
-    ├── mod.rs
-    ├── user.rs         # User model
-    └── client.rs       # Connected client model
+ai-orchestrator/
+├── Cargo.toml                      # Rust dependencies (worker-rs 0.7)
+├── wrangler.toml                   # Cloudflare Workers configuration
+├── schema.sql                      # D1 database schema
+├── .gitignore                      # Build artifacts, secrets
+└── src/
+    ├── lib.rs                      # Worker entry point with routes
+    │                               # Routes: /, /health, /auth/*, /dashboard,
+    │                               # /clients, /clients/:id, /ws/connect, /static/*
+    ├── auth/
+    │   ├── mod.rs                  # GitHub OAuth flow (start, callback, logout)
+    │   │                           # - CSRF state validation
+    │   │                           # - Token exchange with GitHub API
+    │   │                           # - Org/user access restrictions
+    │   │                           # - Base64-encoded session cookies
+    │   └── middleware.rs           # Session validation from cookies
+    │                               # - Decodes session data
+    │                               # - Checks expiration
+    │                               # - Returns User or redirect
+    ├── handlers/
+    │   ├── mod.rs                  # Home page, health check, static assets (R2)
+    │   ├── clients.rs              # HTMX endpoints for client list/cards
+    │   │                           # - GET /clients → client list partial
+    │   │                           # - GET /clients/:id → single card partial
+    │   ├── dashboard.rs            # Main dashboard page (requires auth)
+    │   └── websocket.rs            # WebSocket upgrade → routes to UserHub DO
+    │                               # - Browser connections (type=browser)
+    │                               # - claudecodeui connections (token=xxx)
+    ├── durable_objects/
+    │   ├── mod.rs                  # Exports UserHub
+    │   └── user_hub.rs             # Per-user Durable Object
+    │                               # - WebSocket hub for all user's clients
+    │                               # - Client registry with RefCell<HashMap>
+    │                               # - Browser list for real-time broadcasts
+    │                               # - Message types: Register, StatusUpdate,
+    │                               #   Ping/Pong, GetClients, ClientUpdate
+    ├── models/
+    │   ├── mod.rs                  # Exports User, Session, Client types
+    │   ├── user.rs                 # User and Session models
+    │   │                           # - ID generation (getrandom)
+    │   │                           # - Timestamp handling (js_sys::Date)
+    │   └── client.rs               # Client and ClientMetadata models
+    │                               # - ClientStatus: Idle, Active, Busy, Disconnected
+    └── templates/
+        └── mod.rs                  # Inline HTMX templates (no separate files)
+                                    # - render_home() → login page
+                                    # - render_dashboard() → main UI with WebSocket
+                                    # - render_client_list() → cards grid partial
+                                    # - render_client_card() → single client card
+                                    # - Dark theme CSS included inline
 ```
 
 ### wrangler.jsonc Configuration
