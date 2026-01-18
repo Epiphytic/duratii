@@ -39,6 +39,7 @@ pub enum WsMessage {
 #[durable_object]
 pub struct UserHub {
     state: State,
+    #[allow(dead_code)]
     env: Env,
     /// Connected claudecodeui clients
     clients: HashMap<String, ClientConnection>,
@@ -51,7 +52,6 @@ struct ClientConnection {
     client: Client,
 }
 
-#[durable_object]
 impl DurableObject for UserHub {
     fn new(state: State, env: Env) -> Self {
         Self {
@@ -75,66 +75,16 @@ impl DurableObject for UserHub {
             Response::error("Not found", 404)
         }
     }
-
-    async fn websocket_message(
-        &mut self,
-        ws: WebSocket,
-        message: WebSocketIncomingMessage,
-    ) -> Result<()> {
-        match message {
-            WebSocketIncomingMessage::String(text) => {
-                self.handle_message(&ws, &text).await?;
-            }
-            WebSocketIncomingMessage::Binary(_) => {
-                // Binary messages not supported
-                let _ = ws.send_with_str(r#"{"type":"error","message":"Binary messages not supported"}"#);
-            }
-        }
-        Ok(())
-    }
-
-    async fn websocket_close(
-        &mut self,
-        ws: WebSocket,
-        _code: usize,
-        _reason: String,
-        _was_clean: bool,
-    ) -> Result<()> {
-        // Remove from browsers list
-        self.browsers.retain(|b| b != &ws);
-
-        // Remove from clients and broadcast disconnection
-        let disconnected_id = self
-            .clients
-            .iter()
-            .find(|(_, conn)| conn.websocket == ws)
-            .map(|(id, _)| id.clone());
-
-        if let Some(client_id) = disconnected_id {
-            self.clients.remove(&client_id);
-
-            // Persist to SQLite
-            self.remove_client_from_storage(&client_id).await?;
-
-            // Broadcast disconnection to browsers
-            if let Ok(msg) = serde_json::to_string(&WsMessage::ClientDisconnected { client_id }) {
-                self.broadcast_to_browsers(&msg);
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn websocket_error(&mut self, ws: WebSocket, error: Error) -> Result<()> {
-        console_log!("WebSocket error: {:?}", error);
-        // Treat errors as disconnections
-        self.websocket_close(ws, 1006, "Error".to_string(), false)
-            .await
-    }
 }
 
 impl UserHub {
-    async fn handle_websocket(&mut self, _req: Request) -> Result<Response> {
+    async fn handle_websocket(&mut self, req: Request) -> Result<Response> {
+        // Get the upgrade header
+        let upgrade = req.headers().get("Upgrade")?;
+        if upgrade.as_deref() != Some("websocket") {
+            return Response::error("Expected websocket", 426);
+        }
+
         let pair = WebSocketPair::new()?;
         let server = pair.server;
         let client = pair.client;
@@ -142,14 +92,14 @@ impl UserHub {
         // Accept the connection
         server.accept()?;
 
-        // All connections start as potential claudecodeui clients
-        // Browser connections will identify themselves via message
+        // Set up event handlers using the hibernation API
+        self.state.accept_web_socket(&server);
 
         Response::from_websocket(client)
     }
 
-    async fn handle_message(&mut self, ws: &WebSocket, text: &str) -> Result<()> {
-        let msg: WsMessage = match serde_json::from_str(text) {
+    pub async fn websocket_message(&mut self, ws: &WebSocket, text: String) -> Result<()> {
+        let msg: WsMessage = match serde_json::from_str(&text) {
             Ok(m) => m,
             Err(e) => {
                 let error = WsMessage::Error {
@@ -172,7 +122,7 @@ impl UserHub {
                 let user_id = self.state.id().to_string();
                 let client = Client::new(client_id.clone(), user_id, metadata);
 
-                // Persist to SQLite first
+                // Persist to storage first
                 self.save_client_to_storage(&client).await?;
 
                 // Broadcast update to browsers
@@ -238,6 +188,32 @@ impl UserHub {
 
             _ => {
                 // Other message types not handled here
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn websocket_close(&mut self, ws: &WebSocket) -> Result<()> {
+        // Remove from browsers list
+        self.browsers.retain(|b| b != ws);
+
+        // Remove from clients and broadcast disconnection
+        let disconnected_id = self
+            .clients
+            .iter()
+            .find(|(_, conn)| &conn.websocket == ws)
+            .map(|(id, _)| id.clone());
+
+        if let Some(client_id) = disconnected_id {
+            self.clients.remove(&client_id);
+
+            // Persist removal
+            self.remove_client_from_storage(&client_id).await?;
+
+            // Broadcast disconnection to browsers
+            if let Ok(msg) = serde_json::to_string(&WsMessage::ClientDisconnected { client_id }) {
+                self.broadcast_to_browsers(&msg);
             }
         }
 
