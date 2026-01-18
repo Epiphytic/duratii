@@ -51,7 +51,7 @@ fn generate_id() -> String {
     use getrandom::getrandom;
     let mut bytes = [0u8; 16];
     getrandom(&mut bytes).expect("Failed to generate random bytes");
-    hex::encode(bytes)
+    hex::encode(&bytes)
 }
 
 fn current_timestamp() -> String {
