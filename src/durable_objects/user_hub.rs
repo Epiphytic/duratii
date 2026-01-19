@@ -28,6 +28,12 @@ pub enum WsMessage {
         user_token: String,
         metadata: ClientMetadata,
     },
+    /// Registration response
+    Registered {
+        success: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        message: Option<String>,
+    },
     /// Status update from client
     StatusUpdate {
         client_id: String,
