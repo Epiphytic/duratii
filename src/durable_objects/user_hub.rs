@@ -158,7 +158,6 @@ struct PendingRequest {
 #[durable_object]
 pub struct UserHub {
     state: State,
-    #[allow(dead_code)]
     env: Env,
     /// Connected claudecodeui clients (using RefCell for interior mutability)
     clients: RefCell<HashMap<String, ClientConnection>>,
