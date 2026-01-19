@@ -1228,7 +1228,7 @@ fn layout(title: &str, content: &str) -> String {
             opacity: 1;
         }}
 
-        .last-seen {{
+        .last-seen, .last-activity {{
             font-size: 0.75rem;
             color: var(--text-secondary);
         }}
