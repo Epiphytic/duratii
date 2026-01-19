@@ -910,20 +910,39 @@ fn layout(title: &str, content: &str) -> String {
             gap: 0.75rem;
         }}
 
+        .client-title-link {{
+            flex: 1;
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            padding: 0.5rem;
+            margin: -0.5rem;
+            margin-right: 0.5rem;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }}
+
+        .client-title-link:hover {{
+            background-color: var(--bg-hover, rgba(255, 255, 255, 0.05));
+        }}
+
+        .client-title-link.clickable {{
+            cursor: pointer;
+        }}
+
+        .client-title-link.clickable:hover {{
+            background-color: var(--bg-hover, rgba(255, 255, 255, 0.1));
+        }}
+
         .client-title {{
             font-weight: 600;
             font-size: 1rem;
-            text-decoration: none;
             color: var(--text-primary);
             transition: color 0.2s;
         }}
 
-        a.client-title:hover {{
+        .client-title-link:hover .client-title {{
             color: var(--accent);
-        }}
-
-        a.client-title.clickable {{
-            cursor: pointer;
         }}
 
         .client-hostname {{
