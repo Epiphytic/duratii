@@ -300,7 +300,7 @@ impl UserHub {
         let sql = self.state.storage().sql();
 
         let cursor = sql.exec(
-            "SELECT client_id, user_id, hostname, project, status, last_activity, connected_at, last_seen FROM clients",
+            "SELECT client_id, user_id, hostname, project, status, last_activity, connected_at, last_seen, callback_url FROM clients",
             None,
         )?;
 
