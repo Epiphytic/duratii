@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use wasm_bindgen::JsValue;
 use worker::*;
 
 use crate::auth::AuthMiddleware;
