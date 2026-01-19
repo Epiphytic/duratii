@@ -1517,9 +1517,15 @@ fn layout(title: &str, content: &str) -> String {
             gap: 0.125rem;
         }}
 
-        .panel-client-id {{
+        .panel-title-text {{
             font-weight: 600;
-            font-size: 0.9rem;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }}
+
+        .panel-client-id {{
+            font-size: 0.75rem;
+            color: var(--text-secondary);
         }}
 
         .panel-hostname {{
