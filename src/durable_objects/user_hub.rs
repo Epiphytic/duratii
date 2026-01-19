@@ -490,4 +490,41 @@ impl UserHub {
             let _ = browser.send_with_str(message);
         }
     }
+
+    /// Disconnect a specific client by ID
+    fn disconnect_client(&self, client_id: &str) -> Result<Response> {
+        // Restore state if needed
+        let _ = self.ensure_state_restored();
+
+        // Find and remove the client
+        let connection = self.clients.borrow_mut().remove(client_id);
+
+        if let Some(conn) = connection {
+            // Send disconnect command to the client
+            let disconnect_msg = WsMessage::Error {
+                message: "Disconnected by user".to_string(),
+            };
+            if let Ok(json) = serde_json::to_string(&disconnect_msg) {
+                let _ = conn.websocket.send_with_str(&json);
+            }
+            // Close the WebSocket
+            let _ = conn.websocket.close(Some(1000), Some("Disconnected by user"));
+
+            // Delete from SQLite
+            let _ = self.delete_client(client_id);
+
+            // Broadcast disconnection to browsers
+            if let Ok(msg) =
+                serde_json::to_string(&WsMessage::ClientDisconnected {
+                    client_id: client_id.to_string(),
+                })
+            {
+                self.broadcast_to_browsers(&msg);
+            }
+
+            Response::ok("Client disconnected")
+        } else {
+            Response::error("Client not found", 404)
+        }
+    }
 }
