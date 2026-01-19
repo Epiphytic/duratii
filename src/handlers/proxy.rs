@@ -121,15 +121,13 @@ pub async fn proxy_to_client(mut req: Request, ctx: RouteContext<()>) -> Result<
     }
 
     // Create response with the proxied status and body
-    let mut response = Response::ok(proxy_resp.body)?;
-
     // We need to create a new response with the correct status
     // worker-rs doesn't have a clean way to set status, so we rebuild it
-    let response = if proxy_resp.status != 200 {
+    let response = if proxy_resp.status >= 400 {
         Response::error(&proxy_resp.body, proxy_resp.status)
             .map(|r| r.with_headers(resp_headers))?
     } else {
-        response.with_headers(resp_headers)
+        Response::ok(proxy_resp.body)?.with_headers(resp_headers)
     };
 
     Ok(response)
