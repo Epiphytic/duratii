@@ -270,6 +270,7 @@ pub fn render_client_details(client: &Client) -> String {
     let last_seen = format_relative_time(&client.last_seen);
     let last_activity = escape_html(&last_activity_str);
     let status = client.metadata.status.to_string();
+    let connect_class = if is_connected { "clickable" } else { "" };
 
     let disconnect_btn = if is_connected {
         [
@@ -285,18 +286,18 @@ pub fn render_client_details(client: &Client) -> String {
 
     // Build HTML using concat to avoid Rust 2021 raw identifier issues
     [
-        "<div class=\"client-card expanded\" id=\"client-",
+        "<div class=\"client-card expanded ",
+        connect_class,
+        "\" id=\"client-",
         &id,
         "\" hx-get=\"/clients/",
         &id,
-        "\" hx-trigger=\"refresh from:body\">",
-        "<div class=\"client-header\" hx-get=\"/clients/",
+        "\" hx-trigger=\"refresh from:body\" data-client-id=\"",
         &id,
-        "\" hx-target=\"#client-",
+        "\">",
+        "<div class=\"client-header\">",
+        "<span class=\"client-title\">",
         &id,
-        "\" hx-swap=\"outerHTML\">",
-        "<span class=\"client-hostname\">",
-        &hostname,
         "</span>",
         "<div class=\"header-right\">",
         "<span class=\"status-badge ",
@@ -304,9 +305,15 @@ pub fn render_client_details(client: &Client) -> String {
         "\">",
         &status,
         "</span>",
-        "<span class=\"expand-icon\">▼</span>",
         "</div></div>",
         "<div class=\"client-body\">",
+        "<div class=\"client-info\" onclick=\"connectToClient('",
+        &id,
+        "')\">",
+        "<div class=\"client-hostname\">",
+        &hostname,
+        "</div>",
+        "</div>",
         "<div class=\"client-details\">",
         "<div class=\"detail-row\"><span class=\"detail-label\">Project</span>",
         "<span class=\"detail-value mono\">",
@@ -324,15 +331,19 @@ pub fn render_client_details(client: &Client) -> String {
         "<span class=\"detail-value\">",
         &last_activity,
         "</span></div>",
-        "<div class=\"detail-row\"><span class=\"detail-label\">Client ID</span>",
-        "<span class=\"detail-value mono small\">",
-        &id,
-        "</span></div>",
         "</div>",
         "<div class=\"client-actions\">",
         &disconnect_btn,
         "</div>",
-        "</div></div>",
+        "<div class=\"client-footer\">",
+        "<button class=\"expand-btn\" hx-get=\"/clients/",
+        &id,
+        "\" hx-target=\"#client-",
+        &id,
+        "\" hx-swap=\"outerHTML\" title=\"Hide details\">",
+        "<span class=\"expand-icon\">▼</span>",
+        "</button>",
+        "</div></div></div>",
     ]
     .concat()
 }
