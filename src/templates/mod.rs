@@ -45,22 +45,84 @@ pub fn render_dashboard(user: &User) -> String {
             </main>
             <script>
                 // WebSocket connection for real-time updates
-                const ws = new WebSocket(
-                    (location.protocol === 'https:' ? 'wss:' : 'ws:') +
-                    '//' + location.host + '/ws/connect?type=browser'
-                );
+                let ws;
+                let reconnectAttempts = 0;
+                const maxReconnectAttempts = 5;
 
-                ws.onmessage = (event) => {{
-                    const msg = JSON.parse(event.data);
-                    if (msg.type === 'client_update' || msg.type === 'client_disconnected') {{
-                        // Trigger HTMX refresh
-                        htmx.trigger('#clients-list', 'refresh');
+                function connectWebSocket() {{
+                    ws = new WebSocket(
+                        (location.protocol === 'https:' ? 'wss:' : 'ws:') +
+                        '//' + location.host + '/ws/connect?type=browser'
+                    );
+
+                    ws.onopen = () => {{
+                        console.log('WebSocket connected');
+                        reconnectAttempts = 0;
+                        // Request current client list
+                        ws.send(JSON.stringify({{ type: 'get_clients' }}));
+                    }};
+
+                    ws.onmessage = (event) => {{
+                        const msg = JSON.parse(event.data);
+
+                        if (msg.type === 'client_update') {{
+                            // Update individual client card
+                            const clientId = msg.client.id;
+                            const clientCard = document.getElementById('client-' + clientId);
+                            if (clientCard) {{
+                                // Trigger HTMX to refresh just this card
+                                htmx.trigger(clientCard, 'refresh');
+                            }} else {{
+                                // New client, refresh the entire list
+                                htmx.trigger('#clients-list', 'load');
+                            }}
+                            updateClientCount();
+                        }} else if (msg.type === 'client_disconnected') {{
+                            // Remove the disconnected client card
+                            const clientCard = document.getElementById('client-' + msg.client_id);
+                            if (clientCard) {{
+                                clientCard.style.opacity = '0.5';
+                                clientCard.style.transition = 'opacity 0.3s';
+                                setTimeout(() => {{
+                                    htmx.trigger('#clients-list', 'load');
+                                }}, 300);
+                            }}
+                            updateClientCount();
+                        }} else if (msg.type === 'client_list') {{
+                            // Initial client list received
+                            updateClientCount(msg.clients);
+                        }}
+                    }};
+
+                    ws.onclose = () => {{
+                        console.log('WebSocket closed');
+                        // Attempt to reconnect with exponential backoff
+                        if (reconnectAttempts < maxReconnectAttempts) {{
+                            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+                            reconnectAttempts++;
+                            console.log('Reconnecting in ' + delay + 'ms...');
+                            setTimeout(connectWebSocket, delay);
+                        }}
+                    }};
+
+                    ws.onerror = (error) => {{
+                        console.error('WebSocket error:', error);
+                    }};
+                }}
+
+                function updateClientCount(clients) {{
+                    // Count clients by status and update any badges
+                    const badge = document.getElementById('client-count-badge');
+                    if (badge && clients) {{
+                        const active = clients.filter(c => c.metadata.status === 'active' || c.metadata.status === 'busy').length;
+                        const total = clients.length;
+                        badge.textContent = active > 0 ? active + '/' + total : total;
+                        badge.className = 'count-badge' + (active > 0 ? ' has-active' : '');
                     }}
-                }};
+                }}
 
-                ws.onclose = () => {{
-                    console.log('WebSocket closed, will reconnect on next poll');
-                }};
+                // Start WebSocket connection
+                connectWebSocket();
             </script>
             "#,
             escape_html(&user.github_login)
@@ -132,21 +194,40 @@ pub fn render_client_card(client: &Client) -> String {
 
     // Build HTML using concat to avoid Rust 2021 raw identifier issues
     [
-        "<div class=\"client-card\" id=\"client-", &id, "\" hx-get=\"/clients/", &id,
+        "<div class=\"client-card\" id=\"client-",
+        &id,
+        "\" hx-get=\"/clients/",
+        &id,
         "\" hx-trigger=\"refresh from:body\">",
-        "<div class=\"client-header\" hx-get=\"/clients/", &id, "/details\" hx-target=\"#client-", &id,
+        "<div class=\"client-header\" hx-get=\"/clients/",
+        &id,
+        "/details\" hx-target=\"#client-",
+        &id,
         "\" hx-swap=\"outerHTML\">",
-        "<span class=\"client-hostname\">", &hostname, "</span>",
+        "<span class=\"client-hostname\">",
+        &hostname,
+        "</span>",
         "<div class=\"header-right\">",
-        "<span class=\"status-badge ", status_class, "\">", &status, "</span>",
+        "<span class=\"status-badge ",
+        status_class,
+        "\">",
+        &status,
+        "</span>",
         "<span class=\"expand-icon\">▶</span>",
         "</div></div>",
         "<div class=\"client-body\">",
-        "<div class=\"client-project\" title=\"", &full_project, "\">", &short_project_escaped, "</div>",
+        "<div class=\"client-project\" title=\"",
+        &full_project,
+        "\">",
+        &short_project_escaped,
+        "</div>",
         "<div class=\"client-meta\">",
-        "<span class=\"last-seen\">Last seen: ", &last_seen, "</span>",
+        "<span class=\"last-seen\">Last seen: ",
+        &last_seen,
+        "</span>",
         "</div></div></div>",
-    ].concat()
+    ]
+    .concat()
 }
 
 /// Render expanded client card with full details and actions
@@ -176,41 +257,68 @@ pub fn render_client_details(client: &Client) -> String {
 
     let disconnect_btn = if is_connected {
         [
-            "<button class=\"btn btn-danger btn-sm\" hx-post=\"/clients/", &id,
+            "<button class=\"btn btn-danger btn-sm\" hx-post=\"/clients/",
+            &id,
             "/disconnect\" hx-target=\"#clients-list\" hx-swap=\"innerHTML\" ",
             "hx-confirm=\"Disconnect this client?\">Disconnect</button>",
-        ].concat()
+        ]
+        .concat()
     } else {
         "<span class=\"text-muted\">Client disconnected</span>".to_string()
     };
 
     // Build HTML using concat to avoid Rust 2021 raw identifier issues
     [
-        "<div class=\"client-card expanded\" id=\"client-", &id, "\" hx-get=\"/clients/", &id,
+        "<div class=\"client-card expanded\" id=\"client-",
+        &id,
+        "\" hx-get=\"/clients/",
+        &id,
         "\" hx-trigger=\"refresh from:body\">",
-        "<div class=\"client-header\" hx-get=\"/clients/", &id, "\" hx-target=\"#client-", &id,
+        "<div class=\"client-header\" hx-get=\"/clients/",
+        &id,
+        "\" hx-target=\"#client-",
+        &id,
         "\" hx-swap=\"outerHTML\">",
-        "<span class=\"client-hostname\">", &hostname, "</span>",
+        "<span class=\"client-hostname\">",
+        &hostname,
+        "</span>",
         "<div class=\"header-right\">",
-        "<span class=\"status-badge ", status_class, "\">", &status, "</span>",
+        "<span class=\"status-badge ",
+        status_class,
+        "\">",
+        &status,
+        "</span>",
         "<span class=\"expand-icon\">▼</span>",
         "</div></div>",
         "<div class=\"client-body\">",
         "<div class=\"client-details\">",
         "<div class=\"detail-row\"><span class=\"detail-label\">Project</span>",
-        "<span class=\"detail-value mono\">", &project, "</span></div>",
+        "<span class=\"detail-value mono\">",
+        &project,
+        "</span></div>",
         "<div class=\"detail-row\"><span class=\"detail-label\">Connected</span>",
-        "<span class=\"detail-value\">", &connected_at, "</span></div>",
+        "<span class=\"detail-value\">",
+        &connected_at,
+        "</span></div>",
         "<div class=\"detail-row\"><span class=\"detail-label\">Last Seen</span>",
-        "<span class=\"detail-value\">", &last_seen, "</span></div>",
+        "<span class=\"detail-value\">",
+        &last_seen,
+        "</span></div>",
         "<div class=\"detail-row\"><span class=\"detail-label\">Last Activity</span>",
-        "<span class=\"detail-value\">", &last_activity, "</span></div>",
+        "<span class=\"detail-value\">",
+        &last_activity,
+        "</span></div>",
         "<div class=\"detail-row\"><span class=\"detail-label\">Client ID</span>",
-        "<span class=\"detail-value mono small\">", &id, "</span></div>",
+        "<span class=\"detail-value mono small\">",
+        &id,
+        "</span></div>",
         "</div>",
-        "<div class=\"client-actions\">", &disconnect_btn, "</div>",
+        "<div class=\"client-actions\">",
+        &disconnect_btn,
+        "</div>",
         "</div></div>",
-    ].concat()
+    ]
+    .concat()
 }
 
 /// Wrap content in the base layout
