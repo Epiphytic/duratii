@@ -17,11 +17,24 @@ pub use websocket::websocket_upgrade;
 
 use worker::*;
 
+use crate::auth::AuthMiddleware;
 use crate::templates;
 
-/// Home page - login screen
-pub fn home(_req: Request, _ctx: RouteContext<()>) -> Result<Response> {
-    Response::from_html(templates::render_home())
+/// Home page - login screen (redirects to dashboard if already logged in)
+pub async fn home(req: Request, ctx: RouteContext<()>) -> Result<Response> {
+    // Check if user is already authenticated
+    match AuthMiddleware::require_auth(&req, &ctx.env).await? {
+        Ok(_user) => {
+            // User is logged in, redirect to dashboard
+            let mut headers = Headers::new();
+            headers.set("Location", "/dashboard")?;
+            Ok(Response::empty()?.with_status(302).with_headers(headers))
+        }
+        Err(_) => {
+            // User is not logged in, show login page
+            Response::from_html(templates::render_home())
+        }
+    }
 }
 
 /// Health check endpoint
