@@ -432,7 +432,7 @@ pub fn render_client_card(client: &Client) -> String {
     let is_connected = !matches!(client.metadata.status, ClientStatus::Disconnected);
     let connect_class = if is_connected { "clickable" } else { "" };
 
-    // Build HTML - title is clickable to open proxy interface
+    // Build HTML - header area is clickable to open proxy interface
     [
         "<div class=\"client-card\" id=\"client-",
         &id,
@@ -444,10 +444,12 @@ pub fn render_client_card(client: &Client) -> String {
         "<div class=\"client-header\">",
         "<a href=\"/clients/",
         &id,
-        "/proxy/\" class=\"client-title ",
+        "/proxy/\" class=\"client-title-link ",
         connect_class,
         "\" target=\"_blank\">",
+        "<span class=\"client-title\">",
         &id,
+        "</span>",
         "</a>",
         "<div class=\"header-right\">",
         "<span class=\"status-badge ",
