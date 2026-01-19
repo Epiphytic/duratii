@@ -34,7 +34,10 @@ pub fn render_dashboard(user: &User) -> String {
             </header>
             <main class="dashboard-main">
                 <section class="clients-section">
-                    <h2>Connected Clients</h2>
+                    <div class="section-header">
+                        <h2>Connected Clients</h2>
+                        <span id="client-count-badge" class="count-badge">0</span>
+                    </div>
                     <div id="clients-list"
                          hx-get="/clients"
                          hx-trigger="load, every 30s"
@@ -42,7 +45,27 @@ pub fn render_dashboard(user: &User) -> String {
                         <div class="loading">Loading clients...</div>
                     </div>
                 </section>
+
+                <section class="tokens-section">
+                    <div class="section-header">
+                        <h2>Connection Tokens</h2>
+                        <button class="btn btn-primary btn-sm"
+                                hx-get="/tokens/new"
+                                hx-target="#token-modal"
+                                hx-swap="innerHTML">
+                            + New Token
+                        </button>
+                    </div>
+                    <p class="section-desc">Generate tokens for your Claude Code instances to connect.</p>
+                    <div id="tokens-list"
+                         hx-get="/tokens"
+                         hx-trigger="load"
+                         hx-swap="innerHTML">
+                        <div class="loading">Loading tokens...</div>
+                    </div>
+                </section>
             </main>
+            <div id="token-modal"></div>
             <script>
                 // WebSocket connection for real-time updates
                 let ws;
