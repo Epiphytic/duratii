@@ -135,19 +135,3 @@ pub async fn proxy_to_client(mut req: Request, ctx: RouteContext<()>) -> Result<
 
     Ok(response)
 }
-
-/// Rewrite absolute URLs in HTML to go through the proxy path
-fn rewrite_html_urls(html: &str, client_id: &str) -> String {
-    let proxy_base = format!("/clients/{}/proxy", client_id);
-
-    // Rewrite common absolute URL patterns in HTML
-    // src="/..." -> src="/clients/{id}/proxy/..."
-    // href="/..." -> href="/clients/{id}/proxy/..."
-    // action="/..." -> action="/clients/{id}/proxy/..."
-    html.replace("src=\"/", &format!("src=\"{}/", proxy_base))
-        .replace("href=\"/", &format!("href=\"{}/", proxy_base))
-        .replace("action=\"/", &format!("action=\"{}/", proxy_base))
-        .replace("src='/", &format!("src='{}/", proxy_base))
-        .replace("href='/", &format!("href='{}/", proxy_base))
-        .replace("action='/", &format!("action='{}/", proxy_base))
-}
