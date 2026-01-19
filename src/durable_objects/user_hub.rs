@@ -118,6 +118,25 @@ pub enum WsMessage {
         data: serde_json::Value,
         complete: bool,
     },
+    // ============ HTTP Proxy Messages (via WebSocket) ============
+    /// HTTP proxy request (orchestrator -> claudecodeui)
+    HttpProxyRequest {
+        request_id: String,
+        method: String,
+        path: String,
+        headers: Vec<(String, String)>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        body: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        query: Option<String>,
+    },
+    /// HTTP proxy response (claudecodeui -> orchestrator)
+    HttpProxyResponse {
+        request_id: String,
+        status: u16,
+        headers: Vec<(String, String)>,
+        body: String,
+    },
 }
 
 struct ClientConnection {
