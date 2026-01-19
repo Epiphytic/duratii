@@ -440,12 +440,23 @@ impl UserHub {
                     }
                 }
 
-                let clients: Vec<Client> = self
+                // Get clients from memory first, but also check SQLite for any
+                // clients that might have reconnected since hibernation
+                let mut clients: Vec<Client> = self
                     .clients
                     .borrow()
                     .values()
                     .map(|c| c.client.clone())
                     .collect();
+
+                // If no clients in memory, try loading from SQLite
+                // (clients may have registered but DO hibernated)
+                if clients.is_empty() {
+                    if let Ok(stored) = self.load_clients_from_sqlite() {
+                        clients = stored;
+                    }
+                }
+
                 let response = WsMessage::ClientList { clients };
                 if let Ok(json) = serde_json::to_string(&response) {
                     let _ = ws.send_with_str(&json);
