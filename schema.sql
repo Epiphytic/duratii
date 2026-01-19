@@ -39,6 +39,17 @@ CREATE TABLE IF NOT EXISTS client_tokens (
     revoked_at DATETIME
 );
 
+-- Connected clients (for public path routing without session auth)
+-- Populated when clients register via WebSocket, removed on disconnect
+CREATE TABLE IF NOT EXISTS clients (
+    client_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    hostname TEXT,
+    project TEXT,
+    connected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
