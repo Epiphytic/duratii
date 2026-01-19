@@ -287,8 +287,8 @@ function openWsDebugPanel(clientId) {
     panel.classList.add('show');
 }
 
-function closeCommandPanel() {
-    const panel = document.getElementById('command-panel');
+function closeWsDebugPanel() {
+    const panel = document.getElementById('ws-debug-panel');
     if (panel) {
         panel.classList.remove('show');
         setTimeout(() => panel.remove(), 300);
