@@ -1,3 +1,4 @@
+use futures::channel::oneshot;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
