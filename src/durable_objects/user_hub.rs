@@ -135,6 +135,7 @@ impl DurableObject for UserHub {
             clients: RefCell::new(HashMap::new()),
             browsers: RefCell::new(Vec::new()),
             initialized: RefCell::new(false),
+            pending_requests: RefCell::new(HashMap::new()),
         }
     }
 
