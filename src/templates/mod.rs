@@ -112,7 +112,7 @@ function connectWebSocket() {
             }
             updateClientCount(Object.values(clientsMap));
             if (activeClientId === msg.client_id) {
-                closeCommandPanel();
+                closeWsDebugPanel();
             }
         } else if (msg.type === 'client_list') {
             clientsMap = {};
