@@ -241,10 +241,17 @@ impl UserHub {
                 status TEXT NOT NULL DEFAULT 'idle',
                 last_activity TEXT,
                 connected_at TEXT NOT NULL,
-                last_seen TEXT NOT NULL
+                last_seen TEXT NOT NULL,
+                callback_url TEXT
             )",
             None,
         )?;
+
+        // Migration: Add callback_url column if it doesn't exist (ignore error if already exists)
+        let _ = sql.exec(
+            "ALTER TABLE clients ADD COLUMN callback_url TEXT",
+            None,
+        );
 
         *self.initialized.borrow_mut() = true;
         Ok(())
