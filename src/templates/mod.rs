@@ -236,18 +236,18 @@ pub fn render_client_card(client: &Client) -> String {
         ClientStatus::Disconnected => "status-disconnected",
     };
 
-    // Truncate project path for collapsed view
-    let short_project = truncate_path(&client.metadata.project, 40);
     let id = escape_html(&client.id);
-    let hostname = escape_html(&client.metadata.hostname);
-    let full_project = escape_html(&client.metadata.project);
-    let short_project_escaped = escape_html(&short_project);
-    let last_seen = format_relative_time(&client.last_seen);
+    let last_activity = client
+        .metadata
+        .last_activity
+        .as_ref()
+        .map(|t| format_relative_time(t))
+        .unwrap_or_else(|| "No activity".to_string());
     let status = client.metadata.status.to_string();
     let is_connected = !matches!(client.metadata.status, ClientStatus::Disconnected);
     let connect_class = if is_connected { "clickable" } else { "" };
 
-    // Build HTML using concat to avoid Rust 2021 raw identifier issues
+    // Build HTML - whole card is clickable to connect
     [
         "<div class=\"client-card ",
         connect_class,
@@ -257,7 +257,9 @@ pub fn render_client_card(client: &Client) -> String {
         &id,
         "\" hx-trigger=\"refresh from:body\" data-client-id=\"",
         &id,
-        "\">",
+        "\" onclick=\"connectToClient('",
+        &id,
+        "')\">",
         "<div class=\"client-header\">",
         "<span class=\"client-title\">",
         &id,
@@ -269,22 +271,9 @@ pub fn render_client_card(client: &Client) -> String {
         &status,
         "</span>",
         "</div></div>",
-        "<div class=\"client-body\" onclick=\"connectToClient('",
-        &id,
-        "')\">",
-        "<div class=\"client-info\">",
-        "<div class=\"client-hostname\">",
-        &hostname,
-        "</div>",
-        "<div class=\"client-project\" title=\"",
-        &full_project,
-        "\">",
-        &short_project_escaped,
-        "</div>",
-        "</div>",
         "<div class=\"client-footer\">",
-        "<span class=\"last-seen\">",
-        &last_seen,
+        "<span class=\"last-activity\">",
+        &last_activity,
         "</span>",
         "<button class=\"expand-btn\" hx-get=\"/clients/",
         &id,
@@ -293,7 +282,7 @@ pub fn render_client_card(client: &Client) -> String {
         "\" hx-swap=\"outerHTML\" onclick=\"event.stopPropagation()\" title=\"Show details\">",
         "<span class=\"expand-icon\">▶</span>",
         "</button>",
-        "</div></div></div>",
+        "</div></div>",
     ]
     .concat()
 }
