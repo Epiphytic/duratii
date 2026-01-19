@@ -13,11 +13,8 @@ struct TokenRow {
 
 /// WebSocket upgrade handler - routes to appropriate Durable Object
 pub async fn websocket_upgrade(req: Request, ctx: RouteContext<()>) -> Result<Response> {
-    // Check for WebSocket upgrade header
-    let upgrade = req.headers().get("Upgrade")?;
-    if upgrade.as_deref() != Some("websocket") {
-        return Response::error("Expected WebSocket upgrade", 426);
-    }
+    // Note: Cloudflare handles WebSocket upgrade at edge - we just need to forward to DO
+    // The DO will handle the actual WebSocket connection via WebSocketPair
 
     let url = req.url()?;
     let params: std::collections::HashMap<String, String> = url
