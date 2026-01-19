@@ -1216,6 +1216,33 @@ fn layout(title: &str, content: &str) -> String {
                 font-size: 0.75rem;
             }}
         }}
+
+        /* Toast notification */
+        .toast-notification {{
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1001;
+            opacity: 0;
+            transition: transform 0.3s, opacity 0.3s;
+        }}
+
+        .toast-notification.show {{
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }}
+
+        .last-seen {{
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }}
     </style>
 </head>
 <body>
