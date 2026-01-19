@@ -21,137 +21,111 @@ pub fn render_home() -> String {
 
 /// Render the main dashboard
 pub fn render_dashboard(user: &User) -> String {
-    layout(
-        "Dashboard - AI Orchestrator",
-        &format!(
-            r#"
-            <header class="dashboard-header">
-                <h1>AI Orchestrator</h1>
-                <div class="user-info">
-                    <span>{}</span>
-                    <a href="/auth/logout" class="btn btn-secondary">Logout</a>
-                </div>
-            </header>
-            <main class="dashboard-main">
-                <section class="clients-section">
-                    <div class="section-header">
-                        <h2>Connected Clients</h2>
-                        <span id="client-count-badge" class="count-badge">0</span>
-                    </div>
-                    <div id="clients-list"
-                         hx-get="/clients"
-                         hx-trigger="load, every 30s"
-                         hx-swap="innerHTML">
-                        <div class="loading">Loading clients...</div>
-                    </div>
-                </section>
+    let username = escape_html(&user.github_login);
 
-                <section class="tokens-section">
-                    <div class="section-header">
-                        <h2>Connection Tokens</h2>
-                        <button class="btn btn-primary btn-sm"
-                                hx-get="/tokens/new"
-                                hx-target="#token-modal"
-                                hx-swap="innerHTML">
-                            + New Token
-                        </button>
-                    </div>
-                    <p class="section-desc">Generate tokens for your Claude Code instances to connect.</p>
-                    <div id="tokens-list"
-                         hx-get="/tokens"
-                         hx-trigger="load"
-                         hx-swap="innerHTML">
-                        <div class="loading">Loading tokens...</div>
-                    </div>
-                </section>
-            </main>
-            <div id="token-modal"></div>
-            <script>
-                // WebSocket connection for real-time updates
-                let ws;
-                let reconnectAttempts = 0;
-                const maxReconnectAttempts = 5;
+    let content = [
+        "<header class=\"dashboard-header\">",
+        "<h1>AI Orchestrator</h1>",
+        "<div class=\"user-info\">",
+        "<span>", &username, "</span>",
+        "<a href=\"/auth/logout\" class=\"btn btn-secondary\">Logout</a>",
+        "</div></header>",
+        "<main class=\"dashboard-main\">",
+        "<section class=\"clients-section\">",
+        "<div class=\"section-header\">",
+        "<h2>Connected Clients</h2>",
+        "<span id=\"client-count-badge\" class=\"count-badge\">0</span>",
+        "</div>",
+        "<div id=\"clients-list\" hx-get=\"/clients\" hx-trigger=\"load, every 30s\" hx-swap=\"innerHTML\">",
+        "<div class=\"loading\">Loading clients...</div>",
+        "</div></section>",
+        "<section class=\"tokens-section\">",
+        "<div class=\"section-header\">",
+        "<h2>Connection Tokens</h2>",
+        "<button class=\"btn btn-primary btn-sm\" hx-get=\"/tokens/new\" hx-target=\"#token-modal\" hx-swap=\"innerHTML\">+ New Token</button>",
+        "</div>",
+        "<p class=\"section-desc\">Generate tokens for your Claude Code instances to connect.</p>",
+        "<div id=\"tokens-list\" hx-get=\"/tokens\" hx-trigger=\"load\" hx-swap=\"innerHTML\">",
+        "<div class=\"loading\">Loading tokens...</div>",
+        "</div></section></main>",
+        "<div id=\"token-modal\"></div>",
+        DASHBOARD_SCRIPT,
+    ].concat();
 
-                function connectWebSocket() {{
-                    ws = new WebSocket(
-                        (location.protocol === 'https:' ? 'wss:' : 'ws:') +
-                        '//' + location.host + '/ws/connect?type=browser'
-                    );
-
-                    ws.onopen = () => {{
-                        console.log('WebSocket connected');
-                        reconnectAttempts = 0;
-                        // Request current client list
-                        ws.send(JSON.stringify({{ type: 'get_clients' }}));
-                    }};
-
-                    ws.onmessage = (event) => {{
-                        const msg = JSON.parse(event.data);
-
-                        if (msg.type === 'client_update') {{
-                            // Update individual client card
-                            const clientId = msg.client.id;
-                            const clientCard = document.getElementById('client-' + clientId);
-                            if (clientCard) {{
-                                // Trigger HTMX to refresh just this card
-                                htmx.trigger(clientCard, 'refresh');
-                            }} else {{
-                                // New client, refresh the entire list
-                                htmx.trigger('#clients-list', 'load');
-                            }}
-                            updateClientCount();
-                        }} else if (msg.type === 'client_disconnected') {{
-                            // Remove the disconnected client card
-                            const clientCard = document.getElementById('client-' + msg.client_id);
-                            if (clientCard) {{
-                                clientCard.style.opacity = '0.5';
-                                clientCard.style.transition = 'opacity 0.3s';
-                                setTimeout(() => {{
-                                    htmx.trigger('#clients-list', 'load');
-                                }}, 300);
-                            }}
-                            updateClientCount();
-                        }} else if (msg.type === 'client_list') {{
-                            // Initial client list received
-                            updateClientCount(msg.clients);
-                        }}
-                    }};
-
-                    ws.onclose = () => {{
-                        console.log('WebSocket closed');
-                        // Attempt to reconnect with exponential backoff
-                        if (reconnectAttempts < maxReconnectAttempts) {{
-                            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-                            reconnectAttempts++;
-                            console.log('Reconnecting in ' + delay + 'ms...');
-                            setTimeout(connectWebSocket, delay);
-                        }}
-                    }};
-
-                    ws.onerror = (error) => {{
-                        console.error('WebSocket error:', error);
-                    }};
-                }}
-
-                function updateClientCount(clients) {{
-                    // Count clients by status and update any badges
-                    const badge = document.getElementById('client-count-badge');
-                    if (badge && clients) {{
-                        const active = clients.filter(c => c.metadata.status === 'active' || c.metadata.status === 'busy').length;
-                        const total = clients.length;
-                        badge.textContent = active > 0 ? active + '/' + total : total;
-                        badge.className = 'count-badge' + (active > 0 ? ' has-active' : '');
-                    }}
-                }}
-
-                // Start WebSocket connection
-                connectWebSocket();
-            </script>
-            "#,
-            escape_html(&user.github_login)
-        ),
-    )
+    layout("Dashboard - AI Orchestrator", &content)
 }
+
+const DASHBOARD_SCRIPT: &str = r#"<script>
+let ws;
+let reconnectAttempts = 0;
+const maxReconnectAttempts = 5;
+
+function connectWebSocket() {
+    ws = new WebSocket(
+        (location.protocol === 'https:' ? 'wss:' : 'ws:') +
+        '//' + location.host + '/ws/connect?type=browser'
+    );
+
+    ws.onopen = () => {
+        console.log('WebSocket connected');
+        reconnectAttempts = 0;
+        ws.send(JSON.stringify({ type: 'get_clients' }));
+    };
+
+    ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+
+        if (msg.type === 'client_update') {
+            const clientId = msg.client.id;
+            const clientCard = document.getElementById('client-' + clientId);
+            if (clientCard) {
+                htmx.trigger(clientCard, 'refresh');
+            } else {
+                htmx.trigger('#clients-list', 'load');
+            }
+            updateClientCount();
+        } else if (msg.type === 'client_disconnected') {
+            const clientCard = document.getElementById('client-' + msg.client_id);
+            if (clientCard) {
+                clientCard.style.opacity = '0.5';
+                clientCard.style.transition = 'opacity 0.3s';
+                setTimeout(() => {
+                    htmx.trigger('#clients-list', 'load');
+                }, 300);
+            }
+            updateClientCount();
+        } else if (msg.type === 'client_list') {
+            updateClientCount(msg.clients);
+        }
+    };
+
+    ws.onclose = () => {
+        console.log('WebSocket closed');
+        if (reconnectAttempts < maxReconnectAttempts) {
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+            reconnectAttempts++;
+            console.log('Reconnecting in ' + delay + 'ms...');
+            setTimeout(connectWebSocket, delay);
+        }
+    };
+
+    ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+    };
+}
+
+function updateClientCount(clients) {
+    const badge = document.getElementById('client-count-badge');
+    if (badge && clients) {
+        const active = clients.filter(c => c.metadata.status === 'active' || c.metadata.status === 'busy').length;
+        const total = clients.length;
+        badge.textContent = active > 0 ? active + '/' + total : total;
+        badge.className = 'count-badge' + (active > 0 ? ' has-active' : '');
+    }
+}
+
+connectWebSocket();
+</script>"#;
 
 /// Render the clients page (full page, used for non-HTMX requests)
 pub fn render_clients_page(user: &User, clients: &[Client]) -> String {
