@@ -190,31 +190,28 @@ function updateClientCount(clients) {
 
 let clientsMap = {};
 
-function connectToClient(clientId) {
+function openWsDebugPanel(clientId) {
     const client = clientsMap[clientId];
     if (client && client.metadata && client.metadata.status === 'disconnected') {
         showNotification('Client is disconnected');
         return;
     }
 
+    // Send connect message to establish WebSocket forwarding
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
             type: 'connect_client',
             client_id: clientId
         }));
     }
-    showNotification('Connecting to ' + clientId + '...');
-}
 
-function openCommandPanel(clientId) {
     activeClientId = clientId;
-    const client = clientsMap[clientId];
     const hostname = client ? client.metadata.hostname : clientId;
 
-    let panel = document.getElementById('command-panel');
+    let panel = document.getElementById('ws-debug-panel');
     if (!panel) {
         panel = document.createElement('div');
-        panel.id = 'command-panel';
+        panel.id = 'ws-debug-panel';
         panel.className = 'command-panel';
         document.body.appendChild(panel);
     }
@@ -227,18 +224,18 @@ function openCommandPanel(clientId) {
     header.className = 'command-panel-header';
     const titleDiv = document.createElement('div');
     titleDiv.className = 'command-panel-title';
+    const panelTitle = document.createElement('span');
+    panelTitle.className = 'panel-title-text';
+    panelTitle.textContent = 'WebSocket Debugging';
     const clientSpan = document.createElement('span');
     clientSpan.className = 'panel-client-id';
-    clientSpan.textContent = clientId;
-    const hostSpan = document.createElement('span');
-    hostSpan.className = 'panel-hostname';
-    hostSpan.textContent = hostname;
+    clientSpan.textContent = clientId + ' (' + hostname + ')';
+    titleDiv.appendChild(panelTitle);
     titleDiv.appendChild(clientSpan);
-    titleDiv.appendChild(hostSpan);
     const closeBtn = document.createElement('button');
     closeBtn.className = 'panel-close';
     closeBtn.textContent = '\u00D7';
-    closeBtn.onclick = closeCommandPanel;
+    closeBtn.onclick = closeWsDebugPanel;
     header.appendChild(titleDiv);
     header.appendChild(closeBtn);
     panel.appendChild(header);
