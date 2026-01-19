@@ -532,46 +532,56 @@ impl UserHub {
 
             WsMessage::ConnectClient { client_id } => {
                 // Browser is requesting to connect to a specific claudecodeui client
-                // First check in-memory clients
+                // Only clients with active WebSocket connections can be connected to
                 let client_opt = {
                     let clients = self.clients.borrow();
                     clients.get(&client_id).map(|conn| conn.client.clone())
                 };
 
-                // If not in memory, check SQLite (may have hibernated)
-                let client = client_opt.or_else(|| {
-                    self.load_clients_from_sqlite()
+                let response = if let Some(c) = client_opt {
+                    // Client has an active WebSocket connection
+                    WsMessage::ConnectResponse {
+                        success: true,
+                        client_id: client_id.clone(),
+                        url: None,
+                        message: Some(format!(
+                            "Connected to '{}'. Use forward_to_client to send commands.",
+                            client_id
+                        )),
+                    }
+                } else {
+                    // Check SQLite - if client exists but no WebSocket, mark as disconnected
+                    let client_in_sqlite = self.load_clients_from_sqlite()
                         .ok()
-                        .and_then(|clients| clients.into_iter().find(|c| c.id == client_id))
-                });
+                        .and_then(|clients| clients.into_iter().find(|c| c.id == client_id));
 
-                let response = if let Some(c) = client {
-                    // Client found - check if it's online
-                    let is_online = !matches!(c.metadata.status, ClientStatus::Disconnected);
-                    if is_online {
+                    if let Some(mut stale_client) = client_in_sqlite {
+                        // Mark as disconnected if not already
+                        if !matches!(stale_client.metadata.status, ClientStatus::Disconnected) {
+                            stale_client.update_status(ClientStatus::Disconnected);
+                            let _ = self.save_client(&stale_client);
+
+                            // Broadcast status change to browsers
+                            if let Ok(json) = serde_json::to_string(&WsMessage::ClientUpdate {
+                                client: stale_client,
+                            }) {
+                                self.broadcast_to_browsers(&json);
+                            }
+                        }
+
                         WsMessage::ConnectResponse {
-                            success: true,
+                            success: false,
                             client_id: client_id.clone(),
                             url: None,
-                            message: Some(format!(
-                                "Connected to '{}'. Use forward_to_client to send commands.",
-                                client_id
-                            )),
+                            message: Some("Client is offline (no active connection)".to_string()),
                         }
                     } else {
                         WsMessage::ConnectResponse {
                             success: false,
                             client_id: client_id.clone(),
                             url: None,
-                            message: Some("Client is disconnected".to_string()),
+                            message: Some("Client not found".to_string()),
                         }
-                    }
-                } else {
-                    WsMessage::ConnectResponse {
-                        success: false,
-                        client_id: client_id.clone(),
-                        url: None,
-                        message: Some("Client not found".to_string()),
                     }
                 };
 
