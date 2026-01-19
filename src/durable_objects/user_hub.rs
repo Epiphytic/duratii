@@ -899,7 +899,7 @@ impl UserHub {
     }
 
     /// Disconnect a specific client by ID
-    fn disconnect_client(&self, client_id: &str) -> Result<Response> {
+    async fn disconnect_client(&self, client_id: &str) -> Result<Response> {
         // Restore state if needed
         let _ = self.ensure_state_restored();
 
@@ -919,6 +919,11 @@ impl UserHub {
 
             // Delete from SQLite
             let _ = self.delete_client(client_id);
+
+            // Delete from D1 (for public path routing)
+            if let Err(e) = self.unregister_client_from_d1(client_id).await {
+                console_log!("Failed to unregister client from D1: {:?}", e);
+            }
 
             // Broadcast disconnection to browsers
             if let Ok(msg) =
