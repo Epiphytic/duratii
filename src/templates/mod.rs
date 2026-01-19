@@ -344,6 +344,129 @@ pub fn render_client_details(client: &Client) -> String {
     .concat()
 }
 
+/// Render the token list (HTMX partial)
+pub fn render_token_list(tokens: &[TokenInfo]) -> String {
+    if tokens.is_empty() {
+        return r#"
+            <div class="empty-state small">
+                <p>No tokens created yet.</p>
+                <p class="hint">Create a token to connect Claude Code instances.</p>
+            </div>
+        "#
+        .to_string();
+    }
+
+    let cards: Vec<String> = tokens.iter().map(render_token_card).collect();
+    ["<div class=\"tokens-grid\">", &cards.join("\n"), "</div>"].concat()
+}
+
+/// Render a single token card
+pub fn render_token_card(token: &TokenInfo) -> String {
+    let id = escape_html(&token.id);
+    let name = escape_html(&token.name);
+    let created_at = format_relative_time(&token.created_at);
+    let last_used = token
+        .last_used
+        .as_ref()
+        .map(|t| format_relative_time(t))
+        .unwrap_or_else(|| "Never".to_string());
+
+    let status_class = if token.is_revoked {
+        "token-revoked"
+    } else {
+        "token-active"
+    };
+
+    let actions = if token.is_revoked {
+        "<span class=\"text-muted\">Revoked</span>".to_string()
+    } else {
+        [
+            "<button class=\"btn btn-secondary btn-sm\" hx-post=\"/api/tokens/",
+            &id,
+            "/revoke\" hx-target=\"#tokens-list\" hx-swap=\"innerHTML\" hx-confirm=\"Revoke this token? Connected clients will be disconnected.\">Revoke</button>",
+        ].concat()
+    };
+
+    [
+        "<div class=\"token-card ", status_class, "\" id=\"token-", &id, "\">",
+        "<div class=\"token-header\">",
+        "<span class=\"token-name\">", &name, "</span>",
+        "<span class=\"token-id mono\">", &id[..8.min(id.len())], "...</span>",
+        "</div>",
+        "<div class=\"token-body\">",
+        "<div class=\"token-meta\">",
+        "<span>Created: ", &created_at, "</span>",
+        "<span>Last used: ", &last_used, "</span>",
+        "</div>",
+        "<div class=\"token-actions\">", &actions, "</div>",
+        "</div></div>",
+    ]
+    .concat()
+}
+
+/// Render the token creation modal
+pub fn render_token_modal() -> String {
+    r#"
+    <div class="modal-backdrop" id="modal-backdrop">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Create Connection Token</h3>
+                <button class="modal-close" hx-get="/tokens/close-modal" hx-target="#token-modal" hx-swap="innerHTML">&times;</button>
+            </div>
+            <form hx-post="/api/tokens" hx-target="#token-modal" hx-swap="innerHTML">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="token-name">Token Name</label>
+                        <input type="text" id="token-name" name="name" placeholder="e.g., Work Laptop" required autofocus>
+                        <p class="form-hint">A friendly name to identify this token.</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" hx-get="/tokens/close-modal" hx-target="#token-modal" hx-swap="innerHTML">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Token</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    "#
+    .to_string()
+}
+
+/// Render the token created success modal (shows the token once)
+pub fn render_token_created(token_value: &str, name: &str) -> String {
+    let token = escape_html(token_value);
+    let name_escaped = escape_html(name);
+
+    [
+        "<div class=\"modal-backdrop\" id=\"modal-backdrop\">",
+        "<div class=\"modal\">",
+        "<div class=\"modal-header\">",
+        "<h3>Token Created</h3>",
+        "<button class=\"modal-close\" hx-get=\"/tokens/close-modal\" hx-target=\"#token-modal\" hx-swap=\"innerHTML\" hx-on::after-request=\"htmx.trigger('#tokens-list', 'load')\">&times;</button>",
+        "</div>",
+        "<div class=\"modal-body\">",
+        "<div class=\"success-icon\">✓</div>",
+        "<p class=\"token-name-display\">", &name_escaped, "</p>",
+        "<div class=\"token-display\">",
+        "<code id=\"new-token\">", &token, "</code>",
+        "<button class=\"btn btn-sm btn-secondary copy-btn\">Copy</button>",
+        "</div>",
+        "<p class=\"warning-text\">⚠️ This token will only be shown once. Save it now!</p>",
+        "</div>",
+        "<div class=\"modal-footer\">",
+        "<button class=\"btn btn-primary\" hx-get=\"/tokens/close-modal\" hx-target=\"#token-modal\" hx-swap=\"innerHTML\" hx-on::after-request=\"htmx.trigger('#tokens-list', 'load')\">Done</button>",
+        "</div>",
+        "</div></div>",
+        "<script>",
+        "document.querySelector('.copy-btn').addEventListener('click', function() {",
+        "  navigator.clipboard.writeText(document.getElementById('new-token').textContent);",
+        "  this.textContent = 'Copied!';",
+        "  setTimeout(() => this.textContent = 'Copy', 2000);",
+        "});",
+        "</script>",
+    ].concat()
+}
+
 /// Wrap content in the base layout
 fn layout(title: &str, content: &str) -> String {
     format!(
