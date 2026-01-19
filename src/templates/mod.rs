@@ -123,10 +123,10 @@ function connectWebSocket() {
             }
         } else if (msg.type === 'connect_response') {
             if (msg.success) {
-                showNotification('Connected to ' + msg.client_id);
-                openCommandPanel(msg.client_id);
+                showNotification('WebSocket connected to ' + msg.client_id);
             } else {
                 showNotification(msg.message || 'Unable to connect to client');
+                closeWsDebugPanel();
             }
         } else if (msg.type === 'forwarded_response') {
             handleForwardedResponse(msg);
