@@ -26,11 +26,15 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .get_async("/clients/:id", handlers::get_client)
         .get_async("/clients/:id/details", handlers::get_client_details)
         .post_async("/clients/:id/disconnect", handlers::disconnect_client)
-        // Token management API
+        // Token management API (JSON)
         .get_async("/api/tokens", handlers::list_tokens)
-        .post_async("/api/tokens", handlers::create_token)
-        .post_async("/api/tokens/:id/revoke", handlers::revoke_token)
+        .post_async("/api/tokens", handlers::create_token_api)
+        .post_async("/api/tokens/:id/revoke", handlers::revoke_token_htmx)
         .delete_async("/api/tokens/:id", handlers::delete_token)
+        // Token management UI (HTMX)
+        .get_async("/tokens", handlers::list_tokens_htmx)
+        .get_async("/tokens/new", handlers::show_token_modal)
+        .get_async("/tokens/close-modal", handlers::close_token_modal)
         // WebSocket upgrade for claudecodeui connections
         .get_async("/ws/connect", handlers::websocket_upgrade)
         // Static assets
