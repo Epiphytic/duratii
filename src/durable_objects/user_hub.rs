@@ -130,6 +130,9 @@ pub enum WsMessage {
         body: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         query: Option<String>,
+        /// Base path for URL rewriting (e.g., "/clients/{client_id}/proxy")
+        #[serde(skip_serializing_if = "Option::is_none")]
+        proxy_base: Option<String>,
     },
     /// HTTP proxy response (claudecodeui -> orchestrator)
     HttpProxyResponse {
