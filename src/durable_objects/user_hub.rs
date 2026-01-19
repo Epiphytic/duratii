@@ -474,6 +474,46 @@ impl UserHub {
                 }
             }
 
+            WsMessage::ConnectClient { client_id } => {
+                // Browser is requesting to connect to a specific claudecodeui client
+                let clients = self.clients.borrow();
+                let response = if let Some(conn) = clients.get(&client_id) {
+                    // Client is connected - check if it's online
+                    let is_online = !matches!(conn.client.metadata.status, ClientStatus::Disconnected);
+                    if is_online {
+                        // For now, we inform the browser that the client is connected
+                        // In the future, this could establish a relay or provide a direct URL
+                        WsMessage::ConnectResponse {
+                            success: true,
+                            client_id: client_id.clone(),
+                            url: None, // claudecodeui doesn't expose a public URL by default
+                            message: Some(format!(
+                                "Client '{}' is connected from {}. Direct connection not yet supported.",
+                                client_id, conn.client.metadata.hostname
+                            )),
+                        }
+                    } else {
+                        WsMessage::ConnectResponse {
+                            success: false,
+                            client_id: client_id.clone(),
+                            url: None,
+                            message: Some("Client is disconnected".to_string()),
+                        }
+                    }
+                } else {
+                    WsMessage::ConnectResponse {
+                        success: false,
+                        client_id: client_id.clone(),
+                        url: None,
+                        message: Some("Client not found".to_string()),
+                    }
+                };
+
+                if let Ok(json) = serde_json::to_string(&response) {
+                    let _ = ws.send_with_str(&json);
+                }
+            }
+
             _ => {
                 // Other message types not handled here
             }
