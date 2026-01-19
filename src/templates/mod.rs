@@ -909,6 +909,17 @@ fn layout(title: &str, content: &str) -> String {
         .client-title {{
             font-weight: 600;
             font-size: 1rem;
+            text-decoration: none;
+            color: var(--text-primary);
+            transition: color 0.2s;
+        }}
+
+        a.client-title:hover {{
+            color: var(--accent);
+        }}
+
+        a.client-title.clickable {{
+            cursor: pointer;
         }}
 
         .client-hostname {{
