@@ -3,6 +3,7 @@ use wasm_bindgen::JsValue;
 use worker::*;
 
 use crate::auth::AuthMiddleware;
+use crate::models::User;
 
 /// Proxy request to send to the Durable Object
 #[derive(Debug, Serialize, Deserialize)]
@@ -54,6 +55,32 @@ fn is_public_path(path: &str) -> bool {
     false
 }
 
+/// Look up user by client_id from D1 database
+async fn lookup_user_by_client(env: &Env, client_id: &str) -> Result<Option<User>> {
+    let db = env.d1("DB")?;
+
+    // Query the clients table to find the user_id for this client
+    let stmt = db.prepare("SELECT user_id FROM clients WHERE client_id = ?1");
+    let result = stmt.bind(&[client_id.into()])?.first::<String>(Some("user_id")).await?;
+
+    if let Some(user_id) = result {
+        // Look up the full user record
+        let user_stmt = db.prepare("SELECT id, github_id, github_login, email FROM users WHERE id = ?1");
+        let user_row = user_stmt.bind(&[user_id.into()])?.first::<serde_json::Value>(None).await?;
+
+        if let Some(row) = user_row {
+            return Ok(Some(User {
+                id: row["id"].as_str().unwrap_or_default().to_string(),
+                github_id: row["github_id"].as_i64().unwrap_or(0),
+                github_login: row["github_login"].as_str().unwrap_or_default().to_string(),
+                email: row["email"].as_str().map(|s| s.to_string()),
+            }));
+        }
+    }
+
+    Ok(None)
+}
+
 /// Proxy HTTP requests to claudecodeui instances
 pub async fn proxy_to_client(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
     // Get the proxy path early to check if it's a public resource
@@ -65,46 +92,47 @@ pub async fn proxy_to_client(mut req: Request, ctx: RouteContext<()>) -> Result<
         .ok_or("Missing client ID")?
         .clone();
 
-    // For public paths, try to get user from session but don't require it
-    // If no user, we'll need to look up the client differently (by client_id alone)
-    let user = if is_public_path(&proxy_path) {
-        // For public paths, try auth but allow anonymous access
-        match AuthMiddleware::require_auth(&req, &ctx.env).await? {
-            Ok(user) => Some(user),
-            Err(_) => None, // Allow anonymous access to public paths
-        }
-    } else {
-        // For non-public paths, require authentication
-        // For fetch requests (non-navigation), return 401 instead of redirect to avoid CORS issues
-        match AuthMiddleware::require_auth(&req, &ctx.env).await? {
-        Ok(user) => user,
-        Err(redirect) => {
-            // Check if this is a fetch request (not a page navigation)
-            // Sec-Fetch-Mode: navigate = page load, cors/no-cors/same-origin = fetch
-            let is_fetch = req
-                .headers()
-                .get("Sec-Fetch-Mode")
-                .ok()
-                .flatten()
-                .map(|m| m != "navigate")
-                .unwrap_or(false);
+    let is_public = is_public_path(&proxy_path);
 
-            if is_fetch {
-                // Return 401 for fetch requests to avoid CORS redirect issues
-                return Response::error("Unauthorized", 401);
+    // Try to authenticate the user
+    let user: Option<User> = match AuthMiddleware::require_auth(&req, &ctx.env).await? {
+        Ok(user) => Some(user),
+        Err(redirect) => {
+            if is_public {
+                // For public paths, try to look up user by client_id in D1
+                match lookup_user_by_client(&ctx.env, &client_id).await {
+                    Ok(Some(user)) => Some(user),
+                    Ok(None) => {
+                        // Client not found in D1, can't route
+                        return Response::error("Client not found", 404);
+                    }
+                    Err(e) => {
+                        console_log!("D1 lookup error: {:?}", e);
+                        return Response::error("Internal error", 500);
+                    }
+                }
+            } else {
+                // For non-public paths, check if this is a fetch request
+                // Sec-Fetch-Mode: navigate = page load, cors/no-cors/same-origin = fetch
+                let is_fetch = req
+                    .headers()
+                    .get("Sec-Fetch-Mode")
+                    .ok()
+                    .flatten()
+                    .map(|m| m != "navigate")
+                    .unwrap_or(false);
+
+                if is_fetch {
+                    // Return 401 for fetch requests to avoid CORS redirect issues
+                    return Response::error("Unauthorized", 401);
+                }
+                return Ok(redirect);
             }
-            return Ok(redirect);
         }
     };
 
-    // Get client ID from path parameter
-    let client_id = ctx
-        .param("id")
-        .ok_or("Missing client ID")?
-        .clone();
-
-    // Get the proxy path (everything after /proxy/)
-    let proxy_path = ctx.param("path").unwrap_or(&"".to_string()).clone();
+    // At this point, we should have a user
+    let user = user.ok_or("No user found")?;
 
     // Get query string from original request
     let url = req.url()?;
