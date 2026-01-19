@@ -37,6 +37,12 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .get_async("/tokens/close-modal", handlers::close_token_modal)
         // WebSocket upgrade for claudecodeui connections
         .get_async("/ws/connect", handlers::websocket_upgrade)
+        // HTTP proxy to claudecodeui instances
+        .get_async("/clients/:id/proxy/*path", handlers::proxy_to_client)
+        .post_async("/clients/:id/proxy/*path", handlers::proxy_to_client)
+        .put_async("/clients/:id/proxy/*path", handlers::proxy_to_client)
+        .delete_async("/clients/:id/proxy/*path", handlers::proxy_to_client)
+        .patch_async("/clients/:id/proxy/*path", handlers::proxy_to_client)
         // Static assets
         .get_async("/static/*path", handlers::serve_static)
         .run(req, env)
