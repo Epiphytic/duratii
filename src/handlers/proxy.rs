@@ -112,23 +112,50 @@ pub async fn proxy_to_client(mut req: Request, ctx: RouteContext<()>) -> Result<
 
     // Build the response to return to the client
     let mut resp_headers = Headers::new();
-    for (key, value) in proxy_resp.headers {
+    let mut content_type = String::new();
+    for (key, value) in &proxy_resp.headers {
         let key_lower = key.to_lowercase();
         // Skip hop-by-hop headers in response too
         if !hop_by_hop.contains(&key_lower.as_str()) {
-            let _ = resp_headers.set(&key, &value);
+            let _ = resp_headers.set(key, value);
+        }
+        if key_lower == "content-type" {
+            content_type = value.clone();
         }
     }
+
+    // Rewrite URLs in HTML responses to go through the proxy
+    let response_body = if content_type.contains("text/html") {
+        rewrite_html_urls(&proxy_resp.body, &client_id)
+    } else {
+        proxy_resp.body
+    };
 
     // Create response with the proxied status and body
     // We need to create a new response with the correct status
     // worker-rs doesn't have a clean way to set status, so we rebuild it
     let response = if proxy_resp.status >= 400 {
-        Response::error(&proxy_resp.body, proxy_resp.status)
+        Response::error(&response_body, proxy_resp.status)
             .map(|r| r.with_headers(resp_headers))?
     } else {
-        Response::ok(proxy_resp.body)?.with_headers(resp_headers)
+        Response::ok(response_body)?.with_headers(resp_headers)
     };
 
     Ok(response)
+}
+
+/// Rewrite absolute URLs in HTML to go through the proxy path
+fn rewrite_html_urls(html: &str, client_id: &str) -> String {
+    let proxy_base = format!("/clients/{}/proxy", client_id);
+
+    // Rewrite common absolute URL patterns in HTML
+    // src="/..." -> src="/clients/{id}/proxy/..."
+    // href="/..." -> href="/clients/{id}/proxy/..."
+    // action="/..." -> action="/clients/{id}/proxy/..."
+    html.replace("src=\"/", &format!("src=\"{}/", proxy_base))
+        .replace("href=\"/", &format!("href=\"{}/", proxy_base))
+        .replace("action=\"/", &format!("action=\"{}/", proxy_base))
+        .replace("src='/", &format!("src='{}/", proxy_base))
+        .replace("href='/", &format!("href='{}/", proxy_base))
+        .replace("action='/", &format!("action='{}/", proxy_base))
 }
