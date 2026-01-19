@@ -65,7 +65,7 @@ async fn lookup_user_by_client(env: &Env, client_id: &str) -> Result<Option<User
 
     if let Some(user_id) = result {
         // Look up the full user record
-        let user_stmt = db.prepare("SELECT id, github_id, github_login, email FROM users WHERE id = ?1");
+        let user_stmt = db.prepare("SELECT id, github_id, github_login, email, created_at, last_login FROM users WHERE id = ?1");
         let user_row = user_stmt.bind(&[user_id.into()])?.first::<serde_json::Value>(None).await?;
 
         if let Some(row) = user_row {
@@ -74,6 +74,8 @@ async fn lookup_user_by_client(env: &Env, client_id: &str) -> Result<Option<User
                 github_id: row["github_id"].as_i64().unwrap_or(0),
                 github_login: row["github_login"].as_str().unwrap_or_default().to_string(),
                 email: row["email"].as_str().map(|s| s.to_string()),
+                created_at: row["created_at"].as_str().unwrap_or_default().to_string(),
+                last_login: row["last_login"].as_str().map(|s| s.to_string()),
             }));
         }
     }
