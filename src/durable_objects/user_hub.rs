@@ -363,6 +363,15 @@ impl UserHub {
                 // Note: We need to re-accept with tags, but that's not possible after accept
                 // So we track the mapping in SQLite instead
 
+                // Send registration success response
+                let registered = WsMessage::Registered {
+                    success: true,
+                    message: None,
+                };
+                if let Ok(json) = serde_json::to_string(&registered) {
+                    let _ = ws.send_with_str(&json);
+                }
+
                 // Broadcast update to browsers
                 if let Ok(json) = serde_json::to_string(&WsMessage::ClientUpdate {
                     client: client.clone(),
