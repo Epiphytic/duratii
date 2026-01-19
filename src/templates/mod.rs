@@ -1,4 +1,4 @@
-use crate::models::{Client, ClientStatus, User};
+use crate::models::{Client, ClientStatus, TokenInfo, User};
 
 /// Render the home/login page
 pub fn render_home() -> String {
