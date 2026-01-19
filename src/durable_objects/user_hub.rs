@@ -16,6 +16,25 @@ struct ClientRow {
     last_activity: Option<String>,
     connected_at: String,
     last_seen: String,
+    callback_url: Option<String>,
+}
+
+/// HTTP proxy request from the Worker
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProxyRequest {
+    pub method: String,
+    pub path: String,
+    pub headers: Vec<(String, String)>,
+    pub body: Option<String>,
+    pub query: Option<String>,
+}
+
+/// HTTP proxy response to the Worker
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProxyResponse {
+    pub status: u16,
+    pub headers: Vec<(String, String)>,
+    pub body: String,
 }
 
 /// Message types for WebSocket communication
