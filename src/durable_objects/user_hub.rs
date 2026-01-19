@@ -475,7 +475,7 @@ impl UserHub {
         Ok(())
     }
 
-    fn handle_message(&self, ws: &WebSocket, text: &str) -> Result<()> {
+    async fn handle_message(&self, ws: &WebSocket, text: &str) -> Result<()> {
         // Restore state if waking from hibernation
         let _ = self.ensure_state_restored();
 
@@ -504,6 +504,11 @@ impl UserHub {
 
                 // Save to SQLite for persistence
                 let _ = self.save_client(&client);
+
+                // Register in D1 for public path routing (allows anonymous access to manifest.json etc.)
+                if let Err(e) = self.register_client_in_d1(&client).await {
+                    console_log!("Failed to register client in D1: {:?}", e);
+                }
 
                 // Tag the WebSocket with the client ID for hibernation recovery
                 // Note: We need to re-accept with tags, but that's not possible after accept
