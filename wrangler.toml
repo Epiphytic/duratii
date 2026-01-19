@@ -25,6 +25,10 @@ binding = "ASSETS"
 bucket_name = "orchestrator-assets"
 
 # Environment variables (secrets should use `wrangler secret put`)
+# Required secrets (set via `wrangler secret put <NAME>`):
+#   - GITHUB_CLIENT_SECRET: GitHub OAuth app secret
+#   - CLOUDFLARE_ZONE_ID: Zone ID for cache purge (from Cloudflare dashboard)
+#   - CLOUDFLARE_API_TOKEN: API token with Cache Purge permission
 [vars]
 GITHUB_CLIENT_ID = "Ov23liCmLw4EzqdaoEXD"
 ALLOWED_ORGS = ""
