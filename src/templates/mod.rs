@@ -524,11 +524,21 @@ pub fn render_client_details(client: &Client) -> String {
     ]
     .concat();
 
+    // WebSocket Debugging button (only shown when connected)
+    let ws_debug_btn = if is_connected {
+        [
+            "<button class=\"btn btn-primary btn-sm\" onclick=\"openWsDebugPanel('",
+            &id,
+            "')\">WebSocket Debugging</button>",
+        ]
+        .concat()
+    } else {
+        String::new()
+    };
+
     // Build HTML using concat to avoid Rust 2021 raw identifier issues
     [
-        "<div class=\"client-card expanded ",
-        connect_class,
-        "\" id=\"client-",
+        "<div class=\"client-card expanded\" id=\"client-",
         &id,
         "\" hx-get=\"/clients/",
         &id,
@@ -536,9 +546,13 @@ pub fn render_client_details(client: &Client) -> String {
         &id,
         "\">",
         "<div class=\"client-header\">",
-        "<span class=\"client-title\">",
+        "<a href=\"/clients/",
         &id,
-        "</span>",
+        "/proxy/\" class=\"client-title ",
+        connect_class,
+        "\" target=\"_blank\">",
+        &id,
+        "</a>",
         "<div class=\"header-right\">",
         "<span class=\"status-badge ",
         status_class,
@@ -547,9 +561,7 @@ pub fn render_client_details(client: &Client) -> String {
         "</span>",
         "</div></div>",
         "<div class=\"client-body\">",
-        "<div class=\"client-info\" onclick=\"connectToClient('",
-        &id,
-        "')\">",
+        "<div class=\"client-info\">",
         "<div class=\"client-hostname\">",
         &hostname,
         "</div>",
