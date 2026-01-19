@@ -112,19 +112,15 @@ pub async fn proxy_to_client(mut req: Request, ctx: RouteContext<()>) -> Result<
 
     // Build the response to return to the client
     let mut resp_headers = Headers::new();
-    let mut content_type = String::new();
     for (key, value) in &proxy_resp.headers {
         let key_lower = key.to_lowercase();
         // Skip hop-by-hop headers in response too
         if !hop_by_hop.contains(&key_lower.as_str()) {
             let _ = resp_headers.set(key, value);
         }
-        if key_lower == "content-type" {
-            content_type = value.clone();
-        }
     }
 
-    // URL rewriting is now handled by claudecodeui (it receives proxy_base in the request)
+    // URL rewriting is handled by claudecodeui (it receives proxy_base in the request)
     let response_body = proxy_resp.body;
 
     // Create response with the proxied status and body
