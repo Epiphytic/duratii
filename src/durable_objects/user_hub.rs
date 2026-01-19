@@ -88,6 +88,15 @@ impl DurableObject for UserHub {
             self.handle_websocket(req).await
         } else if path == "/clients" {
             self.get_clients_json()
+        } else if path.starts_with("/clients/") && path.ends_with("/disconnect") {
+            // Extract client_id from /clients/{id}/disconnect
+            let parts: Vec<&str> = path.split('/').collect();
+            if parts.len() >= 3 {
+                let client_id = parts[2];
+                self.disconnect_client(client_id)
+            } else {
+                Response::error("Invalid path", 400)
+            }
         } else {
             Response::error("Not found", 404)
         }
