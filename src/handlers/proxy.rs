@@ -25,9 +25,26 @@ pub struct ProxyResponse {
 /// Proxy HTTP requests to claudecodeui instances
 pub async fn proxy_to_client(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
     // Authenticate user
+    // For fetch requests (non-navigation), return 401 instead of redirect to avoid CORS issues
     let user = match AuthMiddleware::require_auth(&req, &ctx.env).await? {
         Ok(user) => user,
-        Err(redirect) => return Ok(redirect),
+        Err(redirect) => {
+            // Check if this is a fetch request (not a page navigation)
+            // Sec-Fetch-Mode: navigate = page load, cors/no-cors/same-origin = fetch
+            let is_fetch = req
+                .headers()
+                .get("Sec-Fetch-Mode")
+                .ok()
+                .flatten()
+                .map(|m| m != "navigate")
+                .unwrap_or(false);
+
+            if is_fetch {
+                // Return 401 for fetch requests to avoid CORS redirect issues
+                return Response::error("Unauthorized", 401);
+            }
+            return Ok(redirect);
+        }
     };
 
     // Get client ID from path parameter
