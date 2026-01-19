@@ -165,6 +165,8 @@ pub struct UserHub {
     initialized: RefCell<bool>,
     /// Pending requests: request_id -> (client_id, browser_ws)
     pending_requests: RefCell<HashMap<String, PendingRequest>>,
+    /// Pending HTTP proxy requests: request_id -> oneshot sender for response
+    pending_proxy_requests: RefCell<HashMap<String, oneshot::Sender<ProxyResponse>>>,
 }
 
 impl DurableObject for UserHub {
