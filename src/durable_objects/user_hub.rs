@@ -105,6 +105,12 @@ struct ClientConnection {
     client: Client,
 }
 
+/// Tracks a pending forwarded request
+struct PendingRequest {
+    client_id: String,
+    browser_ws: WebSocket,
+}
+
 /// Per-user Durable Object that manages connected claudecodeui instances
 #[durable_object]
 pub struct UserHub {
@@ -117,6 +123,8 @@ pub struct UserHub {
     browsers: RefCell<Vec<WebSocket>>,
     /// Whether SQLite storage has been initialized
     initialized: RefCell<bool>,
+    /// Pending requests: request_id -> (client_id, browser_ws)
+    pending_requests: RefCell<HashMap<String, PendingRequest>>,
 }
 
 impl DurableObject for UserHub {
