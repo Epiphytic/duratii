@@ -81,6 +81,17 @@ pub async fn proxy_to_client(mut req: Request, ctx: RouteContext<()>) -> Result<
         }
     }
 
+    // Add orchestrator user info headers for auto-authentication
+    // claudecodeui can use these to auto-login the user without requiring separate auth
+    headers.push((
+        "X-Orchestrator-User-Id".to_string(),
+        user.github_id.to_string(),
+    ));
+    headers.push((
+        "X-Orchestrator-Username".to_string(),
+        user.github_login.clone(),
+    ));
+
     // Get request body if present
     let body = if req.method() != Method::Get && req.method() != Method::Head {
         req.text().await.ok()
