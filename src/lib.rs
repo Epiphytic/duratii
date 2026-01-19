@@ -24,6 +24,11 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .get_async("/dashboard", handlers::dashboard)
         .get_async("/clients", handlers::get_clients)
         .get_async("/clients/:id", handlers::get_client)
+        // Token management API
+        .get_async("/api/tokens", handlers::list_tokens)
+        .post_async("/api/tokens", handlers::create_token)
+        .post_async("/api/tokens/:id/revoke", handlers::revoke_token)
+        .delete_async("/api/tokens/:id", handlers::delete_token)
         // WebSocket upgrade for claudecodeui connections
         .get_async("/ws/connect", handlers::websocket_upgrade)
         // Static assets

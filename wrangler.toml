@@ -17,7 +17,7 @@ new_sqlite_classes = ["UserHub"]
 [[d1_databases]]
 binding = "DB"
 database_name = "orchestrator-db"
-database_id = "placeholder-replace-with-actual-id"
+database_id = "d50e199d-15ce-4061-813a-20d091ddc0c2"
 
 # R2 bucket for static assets
 [[r2_buckets]]
@@ -26,9 +26,9 @@ bucket_name = "orchestrator-assets"
 
 # Environment variables (secrets should use `wrangler secret put`)
 [vars]
-GITHUB_CLIENT_ID = ""
+GITHUB_CLIENT_ID = "Ov23liCmLw4EzqdaoEXD"
 ALLOWED_ORGS = ""
-ALLOWED_USERS = ""
+ALLOWED_USERS = "liamhelmer"
 ALLOWED_TEAMS = ""
 
 # Development environment

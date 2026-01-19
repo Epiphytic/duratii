@@ -29,6 +29,23 @@ impl User {
             last_login: Some(current_timestamp()),
         }
     }
+
+    /// Create user from D1 database row
+    pub fn from_db(
+        id: String,
+        github_id: i64,
+        github_login: String,
+        email: Option<String>,
+    ) -> Self {
+        Self {
+            id,
+            github_id,
+            github_login,
+            email,
+            created_at: String::new(), // Not needed when loaded from DB
+            last_login: None,
+        }
+    }
 }
 
 impl Session {

@@ -1,42 +1,56 @@
+use serde::Deserialize;
 use worker::*;
 
-use super::{base64_decode, SessionData};
 use crate::models::User;
+
+/// Row returned from D1 session query
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct SessionRow {
+    session_id: String,
+    user_id: String,
+    expires_at: String,
+    github_id: i64,
+    github_login: String,
+    email: Option<String>,
+}
 
 /// Authentication middleware for protected routes
 pub struct AuthMiddleware;
 
 impl AuthMiddleware {
     /// Validate session and return user if authenticated
-    pub async fn get_user(req: &Request, _env: &Env) -> Result<Option<User>> {
-        let session_cookie = match Self::get_session_cookie(req) {
-            Some(cookie) => cookie,
+    pub async fn get_user(req: &Request, env: &Env) -> Result<Option<User>> {
+        let session_id = match Self::get_session_cookie(req) {
+            Some(id) => id,
             None => return Ok(None),
         };
 
-        // Decode and parse session data from cookie
-        let session_json = match base64_decode(&session_cookie) {
-            Ok(json) => json,
-            Err(_) => return Ok(None),
-        };
+        // Look up session in D1
+        let db = env.d1("DB")?;
+        let result = db.prepare(
+            "SELECT s.id as session_id, s.user_id, s.expires_at,
+                    u.github_id, u.github_login, u.email
+             FROM sessions s
+             JOIN users u ON s.user_id = u.id
+             WHERE s.id = ?1 AND s.expires_at > datetime('now')"
+        )
+        .bind(&[session_id.into()])?
+        .first::<SessionRow>(None)
+        .await?;
 
-        let session_data: SessionData = match serde_json::from_str(&session_json) {
-            Ok(data) => data,
-            Err(_) => return Ok(None),
-        };
-
-        // Check expiration (simple string comparison works for ISO 8601)
-        let now = current_timestamp();
-        if session_data.expires_at < now {
-            return Ok(None);
+        match result {
+            Some(row) => {
+                // Session is valid, create user
+                Ok(Some(User::from_db(
+                    row.user_id,
+                    row.github_id,
+                    row.github_login,
+                    row.email,
+                )))
+            }
+            None => Ok(None),
         }
-
-        // Create user from session data
-        Ok(Some(User::new(
-            session_data.github_id,
-            session_data.github_login,
-            None,
-        )))
     }
 
     /// Require authentication, returning error response if not authenticated
@@ -67,37 +81,5 @@ impl AuthMiddleware {
             }
         }
         None
-    }
-}
-
-fn current_timestamp() -> String {
-    let now = js_sys::Date::now();
-    let date = js_sys::Date::new(&wasm_bindgen::JsValue::from_f64(now));
-    date.to_iso_string().as_string().unwrap_or_default()
-}
-
-mod js_sys {
-    use wasm_bindgen::prelude::*;
-
-    #[wasm_bindgen]
-    extern "C" {
-        pub type Date;
-
-        #[wasm_bindgen(constructor)]
-        pub fn new(value: &JsValue) -> Date;
-
-        #[wasm_bindgen(static_method_of = Date)]
-        pub fn now() -> f64;
-
-        #[wasm_bindgen(method, js_name = toISOString)]
-        pub fn to_iso_string(this: &Date) -> JsString;
-    }
-
-    #[wasm_bindgen]
-    extern "C" {
-        pub type JsString;
-
-        #[wasm_bindgen(method, js_name = toString)]
-        pub fn as_string(this: &JsString) -> Option<String>;
     }
 }

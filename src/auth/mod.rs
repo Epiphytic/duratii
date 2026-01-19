@@ -52,7 +52,7 @@ pub async fn start_oauth(req: Request, ctx: RouteContext<()>) -> Result<Response
     headers.set(
         "Set-Cookie",
         &format!(
-            "oauth_state={}; HttpOnly; Secure; SameSite=Lax; Max-Age=600",
+            "oauth_state={}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600",
             state
         ),
     )?;
@@ -64,19 +64,42 @@ pub async fn start_oauth(req: Request, ctx: RouteContext<()>) -> Result<Response
 
 /// Handle GitHub OAuth callback
 pub async fn handle_callback(req: Request, ctx: RouteContext<()>) -> Result<Response> {
+    match handle_callback_inner(req, ctx).await {
+        Ok(response) => Ok(response),
+        Err(e) => {
+            console_log!("OAuth callback error: {:?}", e);
+            Response::error(format!("OAuth error: {:?}", e), 500)
+        }
+    }
+}
+
+async fn handle_callback_inner(req: Request, ctx: RouteContext<()>) -> Result<Response> {
+    console_log!("OAuth callback started");
+
     let url = req.url()?;
     let params: std::collections::HashMap<String, String> = url
         .query_pairs()
         .map(|(k, v)| (k.to_string(), v.to_string()))
         .collect();
 
+    console_log!("Params parsed, verifying state");
+
     // Verify state matches
     let state = params.get("state").ok_or("Missing state parameter")?;
-    let cookie_state = get_cookie(&req, "oauth_state")?;
+    let cookie_state = match get_cookie(&req, "oauth_state") {
+        Ok(s) => s,
+        Err(e) => {
+            console_log!("Failed to get oauth_state cookie: {:?}", e);
+            return Response::error("Cookie not found", 400);
+        }
+    };
 
     if state != &cookie_state {
+        console_log!("State mismatch: {} vs {}", state, cookie_state);
         return Response::error("Invalid state parameter", 400);
     }
+
+    console_log!("State verified, exchanging code for token");
 
     // Exchange code for token
     let code = params.get("code").ok_or("Missing code parameter")?;
@@ -84,10 +107,26 @@ pub async fn handle_callback(req: Request, ctx: RouteContext<()>) -> Result<Resp
     let client_secret = ctx.env.secret("GITHUB_CLIENT_SECRET")?.to_string();
     let redirect_uri = get_redirect_uri(&req)?;
 
-    let token = exchange_code_for_token(&client_id, &client_secret, code, &redirect_uri).await?;
+    let token = match exchange_code_for_token(&client_id, &client_secret, code, &redirect_uri).await {
+        Ok(t) => t,
+        Err(e) => {
+            console_log!("Token exchange failed: {:?}", e);
+            return Response::error(format!("Token exchange failed: {:?}", e), 500);
+        }
+    };
+
+    console_log!("Token obtained, getting user info");
 
     // Get user info
-    let github_user = get_github_user(&token).await?;
+    let github_user = match get_github_user(&token).await {
+        Ok(u) => u,
+        Err(e) => {
+            console_log!("Failed to get GitHub user: {:?}", e);
+            return Response::error(format!("GitHub user fetch failed: {:?}", e), 500);
+        }
+    };
+
+    console_log!("GitHub user: {}", github_user.login);
 
     // Verify org/user/team restrictions
     let allowed_orgs: Vec<String> = ctx
@@ -126,27 +165,64 @@ pub async fn handle_callback(req: Request, ctx: RouteContext<()>) -> Result<Resp
     }
 
     // Create user and session
-    let user = crate::models::User::new(github_user.id, github_user.login, github_user.email);
+    let user = crate::models::User::new(github_user.id, github_user.login.clone(), github_user.email.clone());
     let session = crate::models::Session::new(user.id.clone(), 24 * 7); // 1 week
 
-    // Encode user info in session cookie (simplified - production should use D1)
-    let session_data = serde_json::to_string(&SessionData {
-        session_id: session.id.clone(),
-        user_id: user.id.clone(),
-        github_login: user.github_login.clone(),
-        github_id: user.github_id,
-        expires_at: session.expires_at.clone(),
-    })?;
-    let encoded_session = base64_encode(&session_data);
+    console_log!("Creating user: {} (github_id: {})", user.github_login, user.github_id);
 
-    // Redirect to dashboard with session cookie
+    // Store user and session in D1
+    let db = ctx.env.d1("DB")?;
+
+    // Upsert user
+    let user_result = db.prepare(
+        "INSERT INTO users (id, github_id, github_login, email, last_login)
+         VALUES (?1, ?2, ?3, ?4, CURRENT_TIMESTAMP)
+         ON CONFLICT(github_id) DO UPDATE SET
+         github_login = excluded.github_login,
+         email = excluded.email,
+         last_login = CURRENT_TIMESTAMP"
+    )
+    .bind(&[
+        user.id.clone().into(),
+        wasm_bindgen::JsValue::from_f64(user.github_id as f64),  // D1 doesn't support bigint
+        user.github_login.clone().into(),
+        github_user.email.clone().map(|e| e.into()).unwrap_or(wasm_bindgen::JsValue::NULL),
+    ])?
+    .run()
+    .await;
+
+    if let Err(e) = &user_result {
+        console_log!("Error upserting user: {:?}", e);
+        return Response::error(format!("Database error (user): {:?}", e), 500);
+    }
+    console_log!("User upserted successfully");
+
+    // Insert session
+    let session_result = db.prepare(
+        "INSERT INTO sessions (id, user_id, expires_at) VALUES (?1, ?2, ?3)"
+    )
+    .bind(&[
+        session.id.clone().into(),
+        user.id.clone().into(),
+        session.expires_at.clone().into(),
+    ])?
+    .run()
+    .await;
+
+    if let Err(e) = &session_result {
+        console_log!("Error inserting session: {:?}", e);
+        return Response::error(format!("Database error (session): {:?}", e), 500);
+    }
+    console_log!("Session created successfully");
+
+    // Redirect to dashboard with session ID cookie (just the ID, not full data)
     let headers = Headers::new();
     headers.set("Location", "/dashboard")?;
     headers.set(
         "Set-Cookie",
         &format!(
-            "session={}; HttpOnly; Secure; SameSite=Lax; Max-Age={}",
-            encoded_session,
+            "session={}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age={}",
+            session.id,
             7 * 24 * 60 * 60 // 1 week in seconds
         ),
     )?;
@@ -163,21 +239,12 @@ pub async fn logout(_req: Request, _ctx: RouteContext<()>) -> Result<Response> {
     headers.set("Location", "/")?;
     headers.set(
         "Set-Cookie",
-        "session=; HttpOnly; Secure; SameSite=Lax; Max-Age=0",
+        "session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0",
     )?;
 
     Response::empty()
         .map(|r| r.with_status(302))
         .map(|r| r.with_headers(headers))
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SessionData {
-    pub session_id: String,
-    pub user_id: String,
-    pub github_login: String,
-    pub github_id: i64,
-    pub expires_at: String,
 }
 
 async fn exchange_code_for_token(
@@ -241,8 +308,13 @@ async fn check_org_membership(token: &str, allowed_orgs: &[String]) -> Result<bo
 
 fn get_redirect_uri(req: &Request) -> Result<String> {
     let url = req.url()?;
-    let scheme = url.scheme();
     let host = url.host_str().ok_or("Missing host")?;
+    // Always use HTTPS for Cloudflare Workers (required for Secure cookies)
+    let scheme = if host.ends_with(".workers.dev") || host.ends_with(".pages.dev") {
+        "https"
+    } else {
+        url.scheme()
+    };
     let port = url.port().map(|p| format!(":{}", p)).unwrap_or_default();
     Ok(format!(
         "{}://{}{}/auth/github/callback",
@@ -275,65 +347,4 @@ fn url_encode(s: &str) -> String {
             _ => format!("%{:02X}", c as u8),
         })
         .collect()
-}
-
-fn base64_encode(s: &str) -> String {
-    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let bytes = s.as_bytes();
-    let mut result = String::new();
-
-    for chunk in bytes.chunks(3) {
-        let b0 = chunk[0] as usize;
-        let b1 = chunk.get(1).copied().unwrap_or(0) as usize;
-        let b2 = chunk.get(2).copied().unwrap_or(0) as usize;
-
-        result.push(CHARS[b0 >> 2] as char);
-        result.push(CHARS[((b0 & 0x03) << 4) | (b1 >> 4)] as char);
-
-        if chunk.len() > 1 {
-            result.push(CHARS[((b1 & 0x0f) << 2) | (b2 >> 6)] as char);
-        } else {
-            result.push('=');
-        }
-
-        if chunk.len() > 2 {
-            result.push(CHARS[b2 & 0x3f] as char);
-        } else {
-            result.push('=');
-        }
-    }
-
-    result
-}
-
-pub fn base64_decode(s: &str) -> Result<String> {
-    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-    fn char_to_val(c: char) -> Option<u8> {
-        CHARS.iter().position(|&b| b == c as u8).map(|i| i as u8)
-    }
-
-    let s = s.trim_end_matches('=');
-    let mut bytes = Vec::new();
-
-    for chunk in s.as_bytes().chunks(4) {
-        let vals: Vec<u8> = chunk
-            .iter()
-            .filter_map(|&b| char_to_val(b as char))
-            .collect();
-
-        if vals.is_empty() {
-            break;
-        }
-
-        bytes.push((vals[0] << 2) | (vals.get(1).unwrap_or(&0) >> 4));
-        if vals.len() > 2 {
-            bytes.push((vals[1] << 4) | (vals.get(2).unwrap_or(&0) >> 2));
-        }
-        if vals.len() > 3 {
-            bytes.push((vals[2] << 6) | vals.get(3).unwrap_or(&0));
-        }
-    }
-
-    String::from_utf8(bytes).map_err(|e| worker::Error::RustError(e.to_string()))
 }

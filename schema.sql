@@ -28,8 +28,21 @@ CREATE TABLE IF NOT EXISTS allowed_entities (
     UNIQUE(entity_type, entity_id)
 );
 
+-- Client connection tokens for claudecodeui
+CREATE TABLE IF NOT EXISTS client_tokens (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    name TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_used DATETIME,
+    revoked_at DATETIME
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_allowed_type ON allowed_entities(entity_type);
 CREATE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id);
+CREATE INDEX IF NOT EXISTS idx_tokens_user ON client_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_tokens_hash ON client_tokens(token_hash);
