@@ -96,6 +96,10 @@ function connectWebSocket() {
             updateClientCount();
         } else if (msg.type === 'client_list') {
             updateClientCount(msg.clients);
+            // Refresh the client list to show the cards
+            if (msg.clients && msg.clients.length > 0) {
+                htmx.trigger('#clients-list', 'load');
+            }
         }
     };
 
