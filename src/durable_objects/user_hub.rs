@@ -198,7 +198,7 @@ impl DurableObject for UserHub {
             let parts: Vec<&str> = path.split('/').collect();
             if parts.len() >= 3 {
                 let client_id = parts[2];
-                self.disconnect_client(client_id)
+                self.disconnect_client(client_id).await
             } else {
                 Response::error("Invalid path", 400)
             }
