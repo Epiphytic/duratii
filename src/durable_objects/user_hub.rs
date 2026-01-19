@@ -223,7 +223,7 @@ impl DurableObject for UserHub {
     ) -> Result<()> {
         match message {
             WebSocketIncomingMessage::String(text) => {
-                self.handle_message(&ws, &text)?;
+                self.handle_message(&ws, &text).await?;
             }
             WebSocketIncomingMessage::Binary(_) => {
                 // Binary messages not supported
