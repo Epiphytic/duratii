@@ -361,6 +361,15 @@ fn layout(title: &str, content: &str) -> String {
             border: 1px solid var(--border);
             border-radius: 8px;
             overflow: hidden;
+            transition: border-color 0.2s;
+        }}
+
+        .client-card:hover {{
+            border-color: var(--accent);
+        }}
+
+        .client-card.expanded {{
+            border-color: var(--accent);
         }}
 
         .client-header {{
@@ -370,6 +379,24 @@ fn layout(title: &str, content: &str) -> String {
             padding: 1rem;
             background: var(--bg-tertiary);
             border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.2s;
+        }}
+
+        .client-header:hover {{
+            background: var(--border);
+        }}
+
+        .header-right {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }}
+
+        .expand-icon {{
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            transition: transform 0.2s;
         }}
 
         .client-hostname {{
@@ -399,6 +426,9 @@ fn layout(title: &str, content: &str) -> String {
             color: var(--text-secondary);
             margin-bottom: 1rem;
             word-break: break-all;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }}
 
         .client-meta {{
@@ -407,6 +437,70 @@ fn layout(title: &str, content: &str) -> String {
             gap: 0.25rem;
             font-size: 0.75rem;
             color: var(--text-secondary);
+        }}
+
+        /* Expanded card details */
+        .client-details {{
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }}
+
+        .detail-row {{
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+        }}
+
+        .detail-label {{
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }}
+
+        .detail-value {{
+            font-size: 0.875rem;
+            text-align: right;
+            word-break: break-all;
+        }}
+
+        .detail-value.mono {{
+            font-family: monospace;
+        }}
+
+        .detail-value.small {{
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }}
+
+        /* Client actions */
+        .client-actions {{
+            display: flex;
+            gap: 0.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }}
+
+        .btn-sm {{
+            padding: 0.375rem 0.75rem;
+            font-size: 0.75rem;
+        }}
+
+        .btn-danger {{
+            background: var(--error);
+            color: white;
+            border: none;
+        }}
+
+        .btn-danger:hover {{
+            background: #da3633;
+        }}
+
+        .text-muted {{
+            color: var(--text-secondary);
+            font-size: 0.875rem;
         }}
 
         .empty-state {{
