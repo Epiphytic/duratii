@@ -476,20 +476,30 @@ impl UserHub {
 
             WsMessage::ConnectClient { client_id } => {
                 // Browser is requesting to connect to a specific claudecodeui client
-                let clients = self.clients.borrow();
-                let response = if let Some(conn) = clients.get(&client_id) {
-                    // Client is connected - check if it's online
-                    let is_online = !matches!(conn.client.metadata.status, ClientStatus::Disconnected);
+                // First check in-memory clients
+                let client_opt = {
+                    let clients = self.clients.borrow();
+                    clients.get(&client_id).map(|conn| conn.client.clone())
+                };
+
+                // If not in memory, check SQLite (may have hibernated)
+                let client = client_opt.or_else(|| {
+                    self.load_clients_from_sqlite()
+                        .ok()
+                        .and_then(|clients| clients.into_iter().find(|c| c.id == client_id))
+                });
+
+                let response = if let Some(c) = client {
+                    // Client found - check if it's online
+                    let is_online = !matches!(c.metadata.status, ClientStatus::Disconnected);
                     if is_online {
-                        // For now, we inform the browser that the client is connected
-                        // In the future, this could establish a relay or provide a direct URL
                         WsMessage::ConnectResponse {
                             success: true,
                             client_id: client_id.clone(),
                             url: None, // claudecodeui doesn't expose a public URL by default
                             message: Some(format!(
                                 "Client '{}' is connected from {}. Direct connection not yet supported.",
-                                client_id, conn.client.metadata.hostname
+                                client_id, c.metadata.hostname
                             )),
                         }
                     } else {
