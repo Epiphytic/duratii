@@ -161,7 +161,9 @@ pub fn render_client_details(client: &Client) -> String {
         ClientStatus::Disconnected => "status-disconnected",
     };
 
-    let last_activity = client.metadata.last_activity
+    let last_activity = client
+        .metadata
+        .last_activity
         .as_ref()
         .map(|t| format_relative_time(t))
         .unwrap_or_else(|| "No recent activity".to_string());
@@ -449,9 +451,50 @@ fn escape_html(s: &str) -> String {
         .replace('\'', "&#39;")
 }
 
-/// Format a timestamp for display
+/// Format a timestamp for display (ISO string to human-readable)
 fn format_timestamp(ts: &str) -> String {
     // For now, just return the timestamp as-is
     // In production, you'd format this nicely
     ts.to_string()
+}
+
+/// Format timestamp as relative time (e.g., "2 minutes ago")
+fn format_relative_time(ts: &str) -> String {
+    // Parse ISO timestamp and calculate relative time
+    // For now, return a simplified version
+    if ts.is_empty() {
+        return "Unknown".to_string();
+    }
+
+    // Try to extract just the time portion for display
+    if let Some(time_part) = ts.split('T').nth(1) {
+        if let Some(time) = time_part.split('.').next() {
+            return format!("at {}", time);
+        }
+    }
+
+    ts.to_string()
+}
+
+/// Truncate a file path to fit in a given width
+fn truncate_path(path: &str, max_len: usize) -> String {
+    if path.len() <= max_len {
+        return path.to_string();
+    }
+
+    // Try to keep the last part of the path visible
+    let parts: Vec<&str> = path.split('/').collect();
+    if parts.len() <= 2 {
+        return format!("...{}", &path[path.len().saturating_sub(max_len - 3)..]);
+    }
+
+    // Keep first and last parts
+    let last = parts.last().unwrap_or(&"");
+    let first = parts.first().unwrap_or(&"");
+
+    if first.len() + last.len() + 5 <= max_len {
+        format!("{}/.../{}", first, last)
+    } else {
+        format!(".../{}", last)
+    }
 }
