@@ -1,10 +1,12 @@
 mod clients;
 mod dashboard;
+mod proxy;
 mod tokens;
 mod websocket;
 
 pub use clients::{disconnect_client, get_client, get_client_details, get_clients};
 pub use dashboard::dashboard;
+pub use proxy::proxy_to_client;
 pub use tokens::{
     close_token_modal, create_token_api, delete_token, list_tokens, list_tokens_htmx,
     revoke_token_htmx, show_token_modal, validate_token,
