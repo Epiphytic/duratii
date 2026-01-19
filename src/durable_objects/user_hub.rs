@@ -324,6 +324,7 @@ impl UserHub {
                     project: row_value.project,
                     status,
                     last_activity: row_value.last_activity,
+                    callback_url: row_value.callback_url,
                 },
                 connected_at: row_value.connected_at,
                 last_seen: row_value.last_seen,
