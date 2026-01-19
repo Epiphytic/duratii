@@ -123,32 +123,33 @@ pub fn render_client_card(client: &Client) -> String {
 
     // Truncate project path for collapsed view
     let short_project = truncate_path(&client.metadata.project, 40);
+    let escaped_id = escape_html(&client.id);
 
     format!(
         r#"
-        <div class="client-card" id="client-{id}" hx-get="/clients/{id}" hx-trigger="refresh from:body">
-            <div class="client-header" hx-get="/clients/{id}/details" hx-target="#client-{id}" hx-swap="outerHTML">
-                <span class="client-hostname">{hostname}</span>
+        <div class="client-card" id="client-{0}" hx-get="/clients/{0}" hx-trigger="refresh from:body">
+            <div class="client-header" hx-get="/clients/{0}/details" hx-target="#client-{0}" hx-swap="outerHTML">
+                <span class="client-hostname">{1}</span>
                 <div class="header-right">
-                    <span class="status-badge {status_class}">{status}</span>
+                    <span class="status-badge {2}">{3}</span>
                     <span class="expand-icon">▶</span>
                 </div>
             </div>
             <div class="client-body">
-                <div class="client-project" title="{full_project}">{short_project}</div>
+                <div class="client-project" title="{4}">{5}</div>
                 <div class="client-meta">
-                    <span class="last-seen">Last seen: {last_seen}</span>
+                    <span class="last-seen">Last seen: {6}</span>
                 </div>
             </div>
         </div>
         "#,
-        id = escape_html(&client.id),
-        hostname = escape_html(&client.metadata.hostname),
-        status_class = status_class,
-        status = client.metadata.status,
-        full_project = escape_html(&client.metadata.project),
-        short_project = escape_html(&short_project),
-        last_seen = format_relative_time(&client.last_seen)
+        escaped_id,                                      // 0
+        escape_html(&client.metadata.hostname),          // 1
+        status_class,                                    // 2
+        client.metadata.status,                          // 3
+        escape_html(&client.metadata.project),           // 4
+        escape_html(&short_project),                     // 5
+        format_relative_time(&client.last_seen)          // 6
     )
 }
 
@@ -169,14 +170,24 @@ pub fn render_client_details(client: &Client) -> String {
         .unwrap_or_else(|| "No recent activity".to_string());
 
     let is_connected = !matches!(client.metadata.status, ClientStatus::Disconnected);
+    let escaped_id = escape_html(&client.id);
+
+    let disconnect_btn = if is_connected {
+        format!(
+            r#"<button class="btn btn-danger btn-sm" hx-post="/clients/{}/disconnect" hx-target="#clients-list" hx-swap="innerHTML" hx-confirm="Disconnect this client?">Disconnect</button>"#,
+            escaped_id
+        )
+    } else {
+        r#"<span class="text-muted">Client disconnected</span>"#.to_string()
+    };
 
     format!(
         r#"
-        <div class="client-card expanded" id="client-{id}" hx-get="/clients/{id}" hx-trigger="refresh from:body">
-            <div class="client-header" hx-get="/clients/{id}" hx-target="#client-{id}" hx-swap="outerHTML">
-                <span class="client-hostname">{hostname}</span>
+        <div class="client-card expanded" id="client-{0}" hx-get="/clients/{0}" hx-trigger="refresh from:body">
+            <div class="client-header" hx-get="/clients/{0}" hx-target="#client-{0}" hx-swap="outerHTML">
+                <span class="client-hostname">{1}</span>
                 <div class="header-right">
-                    <span class="status-badge {status_class}">{status}</span>
+                    <span class="status-badge {2}">{3}</span>
                     <span class="expand-icon">▼</span>
                 </div>
             </div>
@@ -184,47 +195,40 @@ pub fn render_client_details(client: &Client) -> String {
                 <div class="client-details">
                     <div class="detail-row">
                         <span class="detail-label">Project</span>
-                        <span class="detail-value mono">{project}</span>
+                        <span class="detail-value mono">{4}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Connected</span>
-                        <span class="detail-value">{connected_at}</span>
+                        <span class="detail-value">{5}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Last Seen</span>
-                        <span class="detail-value">{last_seen}</span>
+                        <span class="detail-value">{6}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Last Activity</span>
-                        <span class="detail-value">{last_activity}</span>
+                        <span class="detail-value">{7}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Client ID</span>
-                        <span class="detail-value mono small">{id}</span>
+                        <span class="detail-value mono small">{0}</span>
                     </div>
                 </div>
                 <div class="client-actions">
-                    {disconnect_btn}
+                    {8}
                 </div>
             </div>
         </div>
         "#,
-        id = escape_html(&client.id),
-        hostname = escape_html(&client.metadata.hostname),
-        status_class = status_class,
-        status = client.metadata.status,
-        project = escape_html(&client.metadata.project),
-        connected_at = format_relative_time(&client.connected_at),
-        last_seen = format_relative_time(&client.last_seen),
-        last_activity = escape_html(&last_activity),
-        disconnect_btn = if is_connected {
-            format!(
-                r#"<button class="btn btn-danger btn-sm" hx-post="/clients/{}/disconnect" hx-confirm="Disconnect this client?">Disconnect</button>"#,
-                escape_html(&client.id)
-            )
-        } else {
-            r#"<span class="text-muted">Client disconnected</span>"#.to_string()
-        }
+        escaped_id,                                      // 0
+        escape_html(&client.metadata.hostname),          // 1
+        status_class,                                    // 2
+        client.metadata.status,                          // 3
+        escape_html(&client.metadata.project),           // 4
+        format_relative_time(&client.connected_at),      // 5
+        format_relative_time(&client.last_seen),         // 6
+        escape_html(&last_activity),                     // 7
+        disconnect_btn                                   // 8
     )
 }
 
