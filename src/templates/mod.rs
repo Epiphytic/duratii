@@ -618,11 +618,19 @@ fn layout(title: &str, content: &str) -> String {
             border: 1px solid var(--border);
             border-radius: 8px;
             overflow: hidden;
-            transition: border-color 0.2s;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }}
 
         .client-card:hover {{
             border-color: var(--accent);
+        }}
+
+        .client-card.clickable {{
+            cursor: pointer;
+        }}
+
+        .client-card.clickable:hover {{
+            box-shadow: 0 0 0 1px var(--accent);
         }}
 
         .client-card.expanded {{
@@ -633,15 +641,9 @@ fn layout(title: &str, content: &str) -> String {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem;
+            padding: 0.75rem 1rem;
             background: var(--bg-tertiary);
             border-bottom: 1px solid var(--border);
-            cursor: pointer;
-            transition: background 0.2s;
-        }}
-
-        .client-header:hover {{
-            background: var(--border);
         }}
 
         .header-right {{
@@ -650,14 +652,53 @@ fn layout(title: &str, content: &str) -> String {
             gap: 0.75rem;
         }}
 
-        .expand-icon {{
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            transition: transform 0.2s;
+        .client-title {{
+            font-weight: 600;
+            font-size: 1rem;
         }}
 
         .client-hostname {{
-            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }}
+
+        .client-info {{
+            cursor: pointer;
+            padding: 0.5rem 0;
+        }}
+
+        .client-info:hover {{
+            color: var(--accent);
+        }}
+
+        .client-footer {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+        }}
+
+        .expand-btn {{
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }}
+
+        .expand-btn:hover {{
+            background: var(--bg-tertiary);
+            border-color: var(--accent);
+            color: var(--accent);
+        }}
+
+        .expand-icon {{
+            font-size: 0.625rem;
+            display: inline-block;
         }}
 
         .status-badge {{
