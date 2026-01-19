@@ -941,6 +941,8 @@ impl UserHub {
         }
 
         // Build and send the HttpProxyRequest message
+        // Include proxy_base so claudecodeui can rewrite URLs in responses
+        let proxy_base = format!("/clients/{}/proxy", client_id);
         let proxy_msg = WsMessage::HttpProxyRequest {
             request_id: request_id.clone(),
             method: proxy_req.method,
@@ -948,6 +950,7 @@ impl UserHub {
             headers: proxy_req.headers,
             body: proxy_req.body,
             query: proxy_req.query,
+            proxy_base: Some(proxy_base),
         };
 
         if let Ok(msg_json) = serde_json::to_string(&proxy_msg) {
