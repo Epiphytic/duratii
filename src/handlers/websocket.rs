@@ -37,10 +37,9 @@ pub async fn websocket_upgrade(req: Request, ctx: RouteContext<()>) -> Result<Re
         let id = namespace.id_from_name(&user.id)?;
         let stub = id.get_stub()?;
 
-        // Create request with WebSocket upgrade headers
+        // Forward with WebSocket upgrade headers for DO
         let headers = Headers::new();
         headers.set("Upgrade", "websocket")?;
-        headers.set("Connection", "Upgrade")?;
 
         let mut init = RequestInit::new();
         init.with_method(Method::Get);
