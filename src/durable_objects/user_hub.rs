@@ -176,6 +176,14 @@ impl DurableObject for UserHub {
             } else {
                 Response::error("Invalid path", 400)
             }
+        } else if path.starts_with("/proxy/") {
+            // Extract client_id from /proxy/{client_id}
+            let client_id = path.strip_prefix("/proxy/").unwrap_or("");
+            if client_id.is_empty() {
+                Response::error("Missing client ID", 400)
+            } else {
+                self.handle_proxy(req, client_id).await
+            }
         } else {
             Response::error("Not found", 404)
         }
