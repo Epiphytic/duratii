@@ -53,6 +53,17 @@ pub enum WsMessage {
     ClientDisconnected { client_id: String },
     /// Error message
     Error { message: String },
+    /// Connect to client request (from browser)
+    ConnectClient { client_id: String },
+    /// Connect response (to browser)
+    ConnectResponse {
+        success: bool,
+        client_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        url: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        message: Option<String>,
+    },
 }
 
 struct ClientConnection {
