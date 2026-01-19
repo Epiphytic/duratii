@@ -822,7 +822,7 @@ impl UserHub {
         Ok(())
     }
 
-    fn handle_close(&self, ws: &WebSocket) {
+    async fn handle_close(&self, ws: &WebSocket) {
         // Remove from browsers list
         self.browsers.borrow_mut().retain(|b| b != ws);
 
@@ -840,6 +840,11 @@ impl UserHub {
 
             // Remove from SQLite
             let _ = self.delete_client(&client_id);
+
+            // Remove from D1 (for public path routing)
+            if let Err(e) = self.unregister_client_from_d1(&client_id).await {
+                console_log!("Failed to unregister client from D1: {:?}", e);
+            }
 
             // Broadcast disconnection to browsers
             if let Ok(msg) =
