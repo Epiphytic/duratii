@@ -90,9 +90,9 @@ pub async fn proxy_to_client(mut req: Request, ctx: RouteContext<()>) -> Result<
     init.with_method(Method::Post);
 
     let body_json = serde_json::to_string(&proxy_req)?;
-    let headers = Headers::new();
-    headers.set("Content-Type", "application/json")?;
-    init.with_headers(headers);
+    let do_headers = Headers::new();
+    do_headers.set("Content-Type", "application/json")?;
+    init.with_headers(do_headers);
     init.with_body(Some(JsValue::from_str(&body_json)));
 
     let do_req = Request::new_with_init(&do_url, &init)?;
@@ -119,15 +119,17 @@ pub async fn proxy_to_client(mut req: Request, ctx: RouteContext<()>) -> Result<
         }
     }
 
-    // Create response with the proxied body
+    // Create response with the proxied status and body
     let mut response = Response::ok(proxy_resp.body)?;
 
-    // Set status code
-    let response = Response::builder()
-        .with_status(proxy_resp.status)
-        .with_headers(resp_headers)
-        .body(ResponseBody::Body(proxy_resp.body.into_bytes()))
-        .build();
+    // We need to create a new response with the correct status
+    // worker-rs doesn't have a clean way to set status, so we rebuild it
+    let response = if proxy_resp.status != 200 {
+        Response::error(&proxy_resp.body, proxy_resp.status)
+            .map(|r| r.with_headers(resp_headers))?
+    } else {
+        response.with_headers(resp_headers)
+    };
 
-    response
+    Ok(response)
 }
