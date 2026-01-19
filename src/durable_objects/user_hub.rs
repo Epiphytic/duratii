@@ -328,6 +328,31 @@ impl UserHub {
         Ok(())
     }
 
+    /// Register client in D1 for public path routing (client_id -> user_id mapping)
+    async fn register_client_in_d1(&self, client: &Client) -> Result<()> {
+        let db = self.env.d1("DB")?;
+        let stmt = db.prepare(
+            "INSERT OR REPLACE INTO clients (client_id, user_id, hostname, project, connected_at, last_seen) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"
+        );
+        stmt.bind(&[
+            client.id.clone().into(),
+            client.user_id.clone().into(),
+            client.metadata.hostname.clone().into(),
+            client.metadata.project.clone().into(),
+            client.connected_at.clone().into(),
+            client.last_seen.clone().into(),
+        ])?.run().await?;
+        Ok(())
+    }
+
+    /// Unregister client from D1
+    async fn unregister_client_from_d1(&self, client_id: &str) -> Result<()> {
+        let db = self.env.d1("DB")?;
+        let stmt = db.prepare("DELETE FROM clients WHERE client_id = ?1");
+        stmt.bind(&[client_id.into()])?.run().await?;
+        Ok(())
+    }
+
     /// Load all clients from SQLite (for recovery after hibernation)
     fn load_clients_from_sqlite(&self) -> Result<Vec<Client>> {
         self.ensure_initialized()?;
