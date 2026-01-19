@@ -57,3 +57,4 @@ CREATE INDEX IF NOT EXISTS idx_allowed_type ON allowed_entities(entity_type);
 CREATE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id);
 CREATE INDEX IF NOT EXISTS idx_tokens_user ON client_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_tokens_hash ON client_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_clients_user ON clients(user_id);
