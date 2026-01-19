@@ -38,6 +38,13 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         // WebSocket upgrade for claudecodeui connections
         .get_async("/ws/connect", handlers::websocket_upgrade)
         // HTTP proxy to claudecodeui instances
+        // Root path proxy (no trailing path)
+        .get_async("/clients/:id/proxy", handlers::proxy_to_client)
+        .post_async("/clients/:id/proxy", handlers::proxy_to_client)
+        .put_async("/clients/:id/proxy", handlers::proxy_to_client)
+        .delete_async("/clients/:id/proxy", handlers::proxy_to_client)
+        .patch_async("/clients/:id/proxy", handlers::proxy_to_client)
+        // Subpath proxy (with trailing path)
         .get_async("/clients/:id/proxy/*path", handlers::proxy_to_client)
         .post_async("/clients/:id/proxy/*path", handlers::proxy_to_client)
         .put_async("/clients/:id/proxy/*path", handlers::proxy_to_client)
