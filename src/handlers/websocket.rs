@@ -41,7 +41,7 @@ pub async fn websocket_upgrade(req: Request, ctx: RouteContext<()>) -> Result<Re
         let stub = id.get_stub()?;
 
         // Create request with WebSocket upgrade headers
-        let mut headers = Headers::new();
+        let headers = Headers::new();
         headers.set("Upgrade", "websocket")?;
         headers.set("Connection", "Upgrade")?;
 
@@ -94,7 +94,7 @@ pub async fn websocket_upgrade(req: Request, ctx: RouteContext<()>) -> Result<Re
         let stub = id.get_stub()?;
 
         // Create request with WebSocket upgrade headers
-        let mut headers = Headers::new();
+        let headers = Headers::new();
         headers.set("Upgrade", "websocket")?;
         headers.set("Connection", "Upgrade")?;
 
