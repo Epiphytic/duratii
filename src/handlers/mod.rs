@@ -3,7 +3,7 @@ mod dashboard;
 mod tokens;
 mod websocket;
 
-pub use clients::{get_client, get_clients};
+pub use clients::{disconnect_client, get_client, get_client_details, get_clients};
 pub use dashboard::dashboard;
 pub use tokens::{create_token, delete_token, list_tokens, revoke_token, validate_token};
 pub use websocket::websocket_upgrade;
