@@ -164,11 +164,10 @@ async fn handle_callback_inner(req: Request, ctx: RouteContext<()>) -> Result<Re
         return Response::error("Access denied: not authorized", 403);
     }
 
-    // Create user and session
-    let user = crate::models::User::new(github_user.id, github_user.login.clone(), github_user.email.clone());
-    let session = crate::models::Session::new(user.id.clone(), 24 * 7); // 1 week
+    // Create user record (for new users)
+    let new_user = crate::models::User::new(github_user.id, github_user.login.clone(), github_user.email.clone());
 
-    console_log!("Creating user: {} (github_id: {})", user.github_login, user.github_id);
+    console_log!("Processing user: {} (github_id: {})", new_user.github_login, new_user.github_id);
 
     // Store user and session in D1
     let db = ctx.env.d1("DB")?;
@@ -183,9 +182,9 @@ async fn handle_callback_inner(req: Request, ctx: RouteContext<()>) -> Result<Re
          last_login = CURRENT_TIMESTAMP"
     )
     .bind(&[
-        user.id.clone().into(),
-        wasm_bindgen::JsValue::from_f64(user.github_id as f64),  // D1 doesn't support bigint
-        user.github_login.clone().into(),
+        new_user.id.clone().into(),
+        wasm_bindgen::JsValue::from_f64(new_user.github_id as f64),  // D1 doesn't support bigint
+        new_user.github_login.clone().into(),
         github_user.email.clone().map(|e| e.into()).unwrap_or(wasm_bindgen::JsValue::NULL),
     ])?
     .run()
@@ -197,13 +196,37 @@ async fn handle_callback_inner(req: Request, ctx: RouteContext<()>) -> Result<Re
     }
     console_log!("User upserted successfully");
 
+    // Fetch the actual user ID (may be different for returning users)
+    #[derive(serde::Deserialize)]
+    struct UserIdRow {
+        id: String,
+    }
+    let user_id_result = db.prepare(
+        "SELECT id FROM users WHERE github_id = ?1"
+    )
+    .bind(&[wasm_bindgen::JsValue::from_f64(github_user.id as f64)])?
+    .first::<UserIdRow>(None)
+    .await?;
+
+    let actual_user_id = match user_id_result {
+        Some(row) => row.id,
+        None => {
+            console_log!("User not found after upsert");
+            return Response::error("User not found after creation", 500);
+        }
+    };
+    console_log!("Using user_id: {}", actual_user_id);
+
+    // Create session with the actual user ID
+    let session = crate::models::Session::new(actual_user_id.clone(), 24 * 7); // 1 week
+
     // Insert session
     let session_result = db.prepare(
         "INSERT INTO sessions (id, user_id, expires_at) VALUES (?1, ?2, ?3)"
     )
     .bind(&[
         session.id.clone().into(),
-        user.id.clone().into(),
+        actual_user_id.into(),
         session.expires_at.clone().into(),
     ])?
     .run()
