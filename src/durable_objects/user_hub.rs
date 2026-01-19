@@ -888,7 +888,7 @@ impl UserHub {
         }
     }
 
-    /// Handle HTTP proxy requests to claudecodeui instances
+    /// Handle HTTP proxy requests to claudecodeui instances via WebSocket
     async fn handle_proxy(&self, mut req: Request, client_id: &str) -> Result<Response> {
         // Restore state if waking from hibernation
         let _ = self.ensure_state_restored();
@@ -898,96 +898,124 @@ impl UserHub {
         let proxy_req: ProxyRequest = serde_json::from_str(&body_text)
             .map_err(|e| Error::RustError(format!("Invalid proxy request: {}", e)))?;
 
-        // Find the client - first check in-memory, then SQLite
-        let callback_url = {
+        // Find the client's WebSocket connection
+        let client_ws = {
             let clients = self.clients.borrow();
-            if let Some(conn) = clients.get(client_id) {
-                conn.client.metadata.callback_url.clone()
-            } else {
-                // Try to load from SQLite (client might be disconnected but have a URL)
-                drop(clients);
-                self.load_clients_from_sqlite()
-                    .ok()
-                    .and_then(|clients| {
-                        clients.into_iter()
-                            .find(|c| c.id == client_id)
-                            .and_then(|c| c.metadata.callback_url)
-                    })
-            }
+            clients.get(client_id).map(|conn| conn.websocket.clone())
         };
 
-        let callback_url = match callback_url {
-            Some(url) => url,
+        let client_ws = match client_ws {
+            Some(ws) => ws,
             None => {
                 return Response::from_json(&ProxyResponse {
                     status: 503,
                     headers: vec![("Content-Type".to_string(), "application/json".to_string())],
-                    body: r#"{"error": "Client does not have a callback URL configured. Set ORCHESTRATOR_CALLBACK_URL in claudecodeui."}"#.to_string(),
+                    body: r#"{"error": "Client not connected"}"#.to_string(),
                 });
             }
         };
 
-        // Build the target URL
-        let target_url = if let Some(query) = &proxy_req.query {
-            format!("{}{}?{}", callback_url.trim_end_matches('/'), proxy_req.path, query)
-        } else {
-            format!("{}{}", callback_url.trim_end_matches('/'), proxy_req.path)
-        };
+        // Generate a unique request ID
+        let request_id = generate_request_id();
 
-        // Build the fetch request
-        let method = match proxy_req.method.to_uppercase().as_str() {
-            "GET" => Method::Get,
-            "POST" => Method::Post,
-            "PUT" => Method::Put,
-            "DELETE" => Method::Delete,
-            "PATCH" => Method::Patch,
-            "HEAD" => Method::Head,
-            "OPTIONS" => Method::Options,
-            _ => Method::Get,
-        };
+        // Create oneshot channel for response
+        let (sender, receiver) = oneshot::channel::<ProxyResponse>();
 
-        let mut init = RequestInit::new();
-        init.with_method(method);
-
-        // Set headers
-        let headers = Headers::new();
-        for (key, value) in &proxy_req.headers {
-            let _ = headers.set(key, value);
-        }
-        init.with_headers(headers);
-
-        // Set body if present
-        if let Some(body) = proxy_req.body {
-            init.with_body(Some(JsValue::from_str(&body)));
+        // Store the sender in pending_proxy_requests
+        {
+            let mut pending = self.pending_proxy_requests.borrow_mut();
+            pending.insert(request_id.clone(), sender);
         }
 
-        // Make the fetch request to the claudecodeui instance
-        let fetch_req = Request::new_with_init(&target_url, &init)?;
-        let mut fetch_resp = match Fetch::Request(fetch_req).send().await {
-            Ok(resp) => resp,
-            Err(e) => {
+        // Build and send the HttpProxyRequest message
+        let proxy_msg = WsMessage::HttpProxyRequest {
+            request_id: request_id.clone(),
+            method: proxy_req.method,
+            path: proxy_req.path,
+            headers: proxy_req.headers,
+            body: proxy_req.body,
+            query: proxy_req.query,
+        };
+
+        if let Ok(msg_json) = serde_json::to_string(&proxy_msg) {
+            if client_ws.send_with_str(&msg_json).is_err() {
+                // Remove from pending and return error
+                self.pending_proxy_requests.borrow_mut().remove(&request_id);
                 return Response::from_json(&ProxyResponse {
                     status: 502,
                     headers: vec![("Content-Type".to_string(), "application/json".to_string())],
-                    body: format!(r#"{{"error": "Failed to connect to claudecodeui: {}"}}"#, e),
+                    body: r#"{"error": "Failed to send request to client"}"#.to_string(),
                 });
             }
-        };
-
-        // Collect response headers
-        let mut resp_headers: Vec<(String, String)> = Vec::new();
-        for (key, value) in fetch_resp.headers() {
-            resp_headers.push((key, value));
         }
 
-        // Get response body as text
-        let resp_body = fetch_resp.text().await.unwrap_or_default();
+        // Wait for response with timeout
+        // Note: In WASM, we use wasm_bindgen_futures and a JavaScript timeout
+        let timeout_ms = 30000; // 30 seconds
+        let timeout_future = async {
+            let promise = js_sys::Promise::new(&mut |resolve, _| {
+                let window = js_sys::global();
+                let _ = js_sys::Reflect::get(&window, &JsValue::from_str("setTimeout"))
+                    .and_then(|set_timeout| {
+                        let set_timeout_fn: js_sys::Function = set_timeout.into();
+                        set_timeout_fn.call2(&JsValue::NULL, &resolve, &JsValue::from(timeout_ms))
+                    });
+            });
+            wasm_bindgen_futures::JsFuture::from(promise).await
+        };
 
-        // Return the proxied response
-        Response::from_json(&ProxyResponse {
-            status: fetch_resp.status_code(),
-            headers: resp_headers,
-            body: resp_body,
-        })
+        // Use futures::select to race between response and timeout
+        use futures::future::{select, Either};
+        use std::pin::pin;
+
+        let receiver_future = pin!(receiver);
+        let timeout_future = pin!(timeout_future);
+
+        let result = select(receiver_future, timeout_future).await;
+
+        match result {
+            Either::Left((Ok(proxy_response), _)) => {
+                // Got response from client
+                Response::from_json(&proxy_response)
+            }
+            Either::Left((Err(_), _)) => {
+                // Channel was dropped (client disconnected?)
+                self.pending_proxy_requests.borrow_mut().remove(&request_id);
+                Response::from_json(&ProxyResponse {
+                    status: 502,
+                    headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                    body: r#"{"error": "Client disconnected before responding"}"#.to_string(),
+                })
+            }
+            Either::Right((_, _)) => {
+                // Timeout
+                self.pending_proxy_requests.borrow_mut().remove(&request_id);
+                Response::from_json(&ProxyResponse {
+                    status: 504,
+                    headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                    body: r#"{"error": "Request timed out"}"#.to_string(),
+                })
+            }
+        }
     }
+
+    /// Handle HttpProxyResponse from claudecodeui
+    fn handle_http_proxy_response(&self, request_id: &str, status: u16, headers: Vec<(String, String)>, body: String) {
+        let mut pending = self.pending_proxy_requests.borrow_mut();
+        if let Some(sender) = pending.remove(request_id) {
+            let response = ProxyResponse {
+                status,
+                headers,
+                body,
+            };
+            let _ = sender.send(response);
+        }
+    }
+}
+
+/// Generate a unique request ID
+fn generate_request_id() -> String {
+    let mut bytes = [0u8; 16];
+    getrandom::getrandom(&mut bytes).unwrap_or_default();
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
