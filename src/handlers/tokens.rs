@@ -4,6 +4,7 @@ use worker::*;
 use crate::auth::AuthMiddleware;
 #[allow(unused_imports)]
 use crate::models::{hash_token, parse_token, verify_token, ClientToken, TokenCreated, TokenInfo};
+use crate::templates;
 
 /// Request to create a new token
 #[derive(Debug, Deserialize)]
