@@ -303,10 +303,8 @@ impl UserHub {
         let server = pair.server;
         let client = pair.client;
 
-        // Accept the connection
-        server.accept()?;
-
-        // Set up event handlers using the hibernation API with tags
+        // Use hibernation API for WebSocket acceptance (don't call server.accept())
+        // This enables automatic wake-up on WebSocket messages
         if is_browser {
             self.state.accept_websocket_with_tags(&server, &["browser"]);
         } else {
