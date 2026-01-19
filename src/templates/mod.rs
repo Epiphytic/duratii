@@ -59,6 +59,20 @@ const DASHBOARD_SCRIPT: &str = r#"<script>
 let ws;
 let reconnectAttempts = 0;
 const maxReconnectAttempts = 5;
+let activeClientId = null;
+let pendingRequests = {};
+
+function generateRequestId() {
+    return 'req_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Escape HTML to prevent XSS - all dynamic content goes through this
+function escapeHtml(str) {
+    if (typeof str !== 'string') str = String(str);
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
 
 function connectWebSocket() {
     ws = new WebSocket(
@@ -74,6 +88,7 @@ function connectWebSocket() {
 
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
+        console.log('[WS] Received:', msg.type, msg);
 
         if (msg.type === 'client_update') {
             const client = msg.client;
@@ -96,21 +111,25 @@ function connectWebSocket() {
                 }, 300);
             }
             updateClientCount(Object.values(clientsMap));
+            if (activeClientId === msg.client_id) {
+                closeCommandPanel();
+            }
         } else if (msg.type === 'client_list') {
-            // Build clients map for quick lookup
             clientsMap = {};
             msg.clients.forEach(c => clientsMap[c.id] = c);
             updateClientCount(msg.clients);
-            // Refresh the client list to show the cards
             if (msg.clients && msg.clients.length > 0) {
                 htmx.trigger('#clients-list', 'load');
             }
         } else if (msg.type === 'connect_response') {
-            if (msg.success && msg.url) {
-                window.open(msg.url, '_blank');
+            if (msg.success) {
+                showNotification('Connected to ' + msg.client_id);
+                openCommandPanel(msg.client_id);
             } else {
                 showNotification(msg.message || 'Unable to connect to client');
             }
+        } else if (msg.type === 'forwarded_response') {
+            handleForwardedResponse(msg);
         }
     };
 
@@ -129,6 +148,36 @@ function connectWebSocket() {
     };
 }
 
+function handleForwardedResponse(msg) {
+    const { client_id, request_id, data, complete } = msg;
+    console.log('[FORWARD] Response from', client_id, ':', data, 'complete:', complete);
+
+    const output = document.getElementById('command-output');
+    if (output) {
+        const div = document.createElement('div');
+        if (data.error) {
+            div.className = 'response-error';
+            div.textContent = data.message || 'Error';
+        } else if (data.raw) {
+            div.className = 'response-raw';
+            div.textContent = data.raw;
+        } else {
+            div.className = 'response-data';
+            const pre = document.createElement('pre');
+            pre.textContent = JSON.stringify(data, null, 2);
+            div.appendChild(pre);
+        }
+        output.appendChild(div);
+        output.scrollTop = output.scrollHeight;
+    }
+
+    if (complete) {
+        delete pendingRequests[request_id];
+        const sendBtn = document.getElementById('send-command-btn');
+        if (sendBtn) sendBtn.disabled = false;
+    }
+}
+
 function updateClientCount(clients) {
     const badge = document.getElementById('client-count-badge');
     if (badge && clients) {
@@ -139,29 +188,171 @@ function updateClientCount(clients) {
     }
 }
 
-// Store client info for quick lookup
 let clientsMap = {};
 
 function connectToClient(clientId) {
     const client = clientsMap[clientId];
-    if (client && client.metadata && client.metadata.url) {
-        // Open claudecodeui in new tab if URL is available
-        window.open(client.metadata.url, '_blank');
-    } else {
-        // Send connect request through WebSocket
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-                type: 'connect_client',
-                client_id: clientId
-            }));
-        }
-        // Show a notification that connection is being established
-        showNotification('Connecting to ' + clientId + '...');
+    if (client && client.metadata && client.metadata.status === 'disconnected') {
+        showNotification('Client is disconnected');
+        return;
     }
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            type: 'connect_client',
+            client_id: clientId
+        }));
+    }
+    showNotification('Connecting to ' + clientId + '...');
+}
+
+function openCommandPanel(clientId) {
+    activeClientId = clientId;
+    const client = clientsMap[clientId];
+    const hostname = client ? client.metadata.hostname : clientId;
+
+    let panel = document.getElementById('command-panel');
+    if (!panel) {
+        panel = document.createElement('div');
+        panel.id = 'command-panel';
+        panel.className = 'command-panel';
+        document.body.appendChild(panel);
+    }
+
+    // Clear and rebuild panel content safely
+    panel.textContent = '';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'command-panel-header';
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'command-panel-title';
+    const clientSpan = document.createElement('span');
+    clientSpan.className = 'panel-client-id';
+    clientSpan.textContent = clientId;
+    const hostSpan = document.createElement('span');
+    hostSpan.className = 'panel-hostname';
+    hostSpan.textContent = hostname;
+    titleDiv.appendChild(clientSpan);
+    titleDiv.appendChild(hostSpan);
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'panel-close';
+    closeBtn.textContent = '\u00D7';
+    closeBtn.onclick = closeCommandPanel;
+    header.appendChild(titleDiv);
+    header.appendChild(closeBtn);
+    panel.appendChild(header);
+
+    // Output area
+    const output = document.createElement('div');
+    output.id = 'command-output';
+    output.className = 'command-output';
+    panel.appendChild(output);
+
+    // Input area
+    const inputArea = document.createElement('div');
+    inputArea.className = 'command-input-area';
+
+    const select = document.createElement('select');
+    select.id = 'command-action';
+    select.className = 'command-select';
+    const options = [
+        ['get-active-sessions', 'Get Active Sessions'],
+        ['check-session-status', 'Check Session Status'],
+        ['claude-command', 'Send Claude Command'],
+        ['abort-session', 'Abort Session']
+    ];
+    options.forEach(([val, txt]) => {
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = txt;
+        select.appendChild(opt);
+    });
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = 'command-input';
+    input.className = 'command-input';
+    input.placeholder = 'Enter command or message...';
+    input.onkeypress = (e) => { if (e.key === 'Enter') sendCommand(); };
+
+    const sendBtn = document.createElement('button');
+    sendBtn.id = 'send-command-btn';
+    sendBtn.className = 'btn btn-primary btn-sm';
+    sendBtn.textContent = 'Send';
+    sendBtn.onclick = sendCommand;
+
+    inputArea.appendChild(select);
+    inputArea.appendChild(input);
+    inputArea.appendChild(sendBtn);
+    panel.appendChild(inputArea);
+
+    panel.classList.add('show');
+}
+
+function closeCommandPanel() {
+    const panel = document.getElementById('command-panel');
+    if (panel) {
+        panel.classList.remove('show');
+        setTimeout(() => panel.remove(), 300);
+    }
+    activeClientId = null;
+}
+
+function sendCommand() {
+    if (!activeClientId || !ws || ws.readyState !== WebSocket.OPEN) {
+        showNotification('Not connected to a client');
+        return;
+    }
+
+    const actionSelect = document.getElementById('command-action');
+    const inputEl = document.getElementById('command-input');
+    const action = actionSelect.value;
+    const input = inputEl.value.trim();
+
+    const requestId = generateRequestId();
+
+    let payload = {};
+    if (action === 'claude-command' && input) {
+        payload = { message: input, command: input };
+    } else if (action === 'check-session-status') {
+        payload = { session_id: input || 'current' };
+    } else if (action === 'abort-session') {
+        payload = { session_id: input || 'current' };
+    }
+
+    const msg = {
+        type: 'forward_to_client',
+        client_id: activeClientId,
+        request_id: requestId,
+        action: action,
+        payload: payload
+    };
+
+    console.log('[WS] Sending:', msg);
+    ws.send(JSON.stringify(msg));
+
+    pendingRequests[requestId] = { clientId: activeClientId, action, time: Date.now() };
+
+    const output = document.getElementById('command-output');
+    if (output) {
+        const cmdDiv = document.createElement('div');
+        cmdDiv.className = 'command-sent';
+        cmdDiv.textContent = '> ' + action + (input ? ': ' + input : '');
+        output.appendChild(cmdDiv);
+        output.scrollTop = output.scrollHeight;
+    }
+
+    inputEl.value = '';
+    document.getElementById('send-command-btn').disabled = true;
+
+    setTimeout(() => {
+        const btn = document.getElementById('send-command-btn');
+        if (btn) btn.disabled = false;
+    }, 5000);
 }
 
 function showNotification(message) {
-    // Create a simple toast notification
     const existing = document.querySelector('.toast-notification');
     if (existing) existing.remove();
 
@@ -176,9 +367,6 @@ function showNotification(message) {
         setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
-
-// Update clients map when we receive client list
-const originalOnMessage = null;
 
 connectWebSocket();
 </script>"#;
