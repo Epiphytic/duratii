@@ -1420,6 +1420,151 @@ fn layout(title: &str, content: &str) -> String {
             font-size: 0.75rem;
             color: var(--text-secondary);
         }}
+
+        /* Command Panel */
+        .command-panel {{
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 450px;
+            max-width: 100%;
+            height: 400px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px 12px 0 0;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }}
+
+        .command-panel.show {{
+            transform: translateY(0);
+        }}
+
+        .command-panel-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border);
+            border-radius: 12px 12px 0 0;
+        }}
+
+        .command-panel-title {{
+            display: flex;
+            flex-direction: column;
+            gap: 0.125rem;
+        }}
+
+        .panel-client-id {{
+            font-weight: 600;
+            font-size: 0.9rem;
+        }}
+
+        .panel-hostname {{
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }}
+
+        .panel-close {{
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            line-height: 1;
+            padding: 0.25rem;
+        }}
+
+        .panel-close:hover {{
+            color: var(--text-primary);
+        }}
+
+        .command-output {{
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.75rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+            background: var(--bg-primary);
+        }}
+
+        .command-sent {{
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }}
+
+        .response-data {{
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }}
+
+        .response-data pre {{
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }}
+
+        .response-error {{
+            color: var(--error);
+            margin-bottom: 0.5rem;
+        }}
+
+        .response-raw {{
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }}
+
+        .command-input-area {{
+            display: flex;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            border-top: 1px solid var(--border);
+            background: var(--bg-tertiary);
+        }}
+
+        .command-select {{
+            padding: 0.5rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 0.8rem;
+        }}
+
+        .command-input {{
+            flex: 1;
+            padding: 0.5rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }}
+
+        .command-input:focus {{
+            outline: none;
+            border-color: var(--accent);
+        }}
+
+        @media (max-width: 480px) {{
+            .command-panel {{
+                width: 100%;
+                height: 50vh;
+            }}
+
+            .command-input-area {{
+                flex-wrap: wrap;
+            }}
+
+            .command-select {{
+                width: 100%;
+            }}
+        }}
     </style>
 </head>
 <body>
