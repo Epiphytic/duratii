@@ -362,17 +362,31 @@ pub fn render_token_card(token: &TokenInfo) -> String {
     };
 
     [
-        "<div class=\"token-card ", status_class, "\" id=\"token-", &id, "\">",
+        "<div class=\"token-card ",
+        status_class,
+        "\" id=\"token-",
+        &id,
+        "\">",
         "<div class=\"token-header\">",
-        "<span class=\"token-name\">", &name, "</span>",
-        "<span class=\"token-id mono\">", &id[..8.min(id.len())], "...</span>",
+        "<span class=\"token-name\">",
+        &name,
+        "</span>",
+        "<span class=\"token-id mono\">",
+        &id[..8.min(id.len())],
+        "...</span>",
         "</div>",
         "<div class=\"token-body\">",
         "<div class=\"token-meta\">",
-        "<span>Created: ", &created_at, "</span>",
-        "<span>Last used: ", &last_used, "</span>",
+        "<span>Created: ",
+        &created_at,
+        "</span>",
+        "<span>Last used: ",
+        &last_used,
+        "</span>",
         "</div>",
-        "<div class=\"token-actions\">", &actions, "</div>",
+        "<div class=\"token-actions\">",
+        &actions,
+        "</div>",
         "</div></div>",
     ]
     .concat()
@@ -962,6 +976,122 @@ fn layout(title: &str, content: &str) -> String {
 
         .mono {{
             font-family: monospace;
+        }}
+
+        /* Mobile responsive styles */
+        @media (max-width: 768px) {{
+            .dashboard-header {{
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+                padding: 1rem;
+            }}
+
+            .dashboard-header h1 {{
+                font-size: 1.25rem;
+            }}
+
+            .user-info {{
+                width: 100%;
+                justify-content: center;
+            }}
+
+            .dashboard-main {{
+                padding: 1rem;
+            }}
+
+            .clients-grid {{
+                grid-template-columns: 1fr;
+            }}
+
+            .section-header {{
+                flex-direction: column;
+                gap: 0.75rem;
+                align-items: flex-start;
+            }}
+
+            .section-header h2 {{
+                font-size: 1.1rem;
+            }}
+
+            .client-card {{
+                margin: 0;
+            }}
+
+            .client-header {{
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }}
+
+            .header-right {{
+                width: 100%;
+                justify-content: space-between;
+            }}
+
+            .detail-row {{
+                flex-direction: column;
+                gap: 0.25rem;
+            }}
+
+            .detail-value {{
+                text-align: left;
+            }}
+
+            .client-actions {{
+                flex-wrap: wrap;
+            }}
+
+            .token-meta {{
+                flex-direction: column;
+                gap: 0.5rem;
+            }}
+
+            .modal {{
+                margin: 0.5rem;
+                max-height: 90vh;
+                overflow-y: auto;
+            }}
+
+            .modal-body {{
+                padding: 1rem;
+            }}
+
+            .modal-footer {{
+                flex-direction: column-reverse;
+                gap: 0.5rem;
+            }}
+
+            .modal-footer button {{
+                width: 100%;
+            }}
+
+            .token-display {{
+                flex-direction: column;
+            }}
+
+            .token-display button {{
+                width: 100%;
+            }}
+        }}
+
+        @media (max-width: 480px) {{
+            .login-container h1 {{
+                font-size: 2rem;
+            }}
+
+            .btn {{
+                padding: 0.625rem 1rem;
+                font-size: 0.875rem;
+            }}
+
+            .status-badge {{
+                padding: 0.2rem 0.5rem;
+                font-size: 0.7rem;
+            }}
+
+            .client-project {{
+                font-size: 0.75rem;
+            }}
         }}
     </style>
 </head>
