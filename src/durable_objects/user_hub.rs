@@ -263,8 +263,8 @@ impl UserHub {
         let sql = self.state.storage().sql();
 
         sql.exec(
-            "INSERT OR REPLACE INTO clients (client_id, user_id, hostname, project, status, last_activity, connected_at, last_seen)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO clients (client_id, user_id, hostname, project, status, last_activity, connected_at, last_seen, callback_url)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             Some(vec![
                 SqlStorageValue::String(client.id.clone()),
                 SqlStorageValue::String(client.user_id.clone()),
@@ -274,6 +274,7 @@ impl UserHub {
                 client.metadata.last_activity.clone().map(SqlStorageValue::String).unwrap_or(SqlStorageValue::Null),
                 SqlStorageValue::String(client.connected_at.clone()),
                 SqlStorageValue::String(client.last_seen.clone()),
+                client.metadata.callback_url.clone().map(SqlStorageValue::String).unwrap_or(SqlStorageValue::Null),
             ]),
         )?;
 
