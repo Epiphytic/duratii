@@ -772,6 +772,16 @@ impl UserHub {
                 }
             }
 
+            WsMessage::HttpProxyResponse {
+                request_id,
+                status,
+                headers,
+                body,
+            } => {
+                // HTTP proxy response from claudecodeui - resolve the pending request
+                self.handle_http_proxy_response(&request_id, status, headers, body);
+            }
+
             _ => {
                 // Other message types not handled here (UserRequest, ForwardedResponse are outbound only)
             }
