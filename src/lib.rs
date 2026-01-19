@@ -14,7 +14,7 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 
     Router::new()
         // Public routes
-        .get("/", handlers::home)
+        .get_async("/", handlers::home)
         .get("/health", handlers::health)
         // Auth routes
         .get_async("/auth/github", auth::start_oauth)
