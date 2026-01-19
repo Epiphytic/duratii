@@ -539,10 +539,10 @@ impl UserHub {
                         WsMessage::ConnectResponse {
                             success: true,
                             client_id: client_id.clone(),
-                            url: None, // claudecodeui doesn't expose a public URL by default
+                            url: None,
                             message: Some(format!(
-                                "Client '{}' is connected from {}. Direct connection not yet supported.",
-                                client_id, c.metadata.hostname
+                                "Connected to '{}'. Use forward_to_client to send commands.",
+                                client_id
                             )),
                         }
                     } else {
@@ -567,8 +567,89 @@ impl UserHub {
                 }
             }
 
+            WsMessage::ForwardToClient {
+                client_id,
+                request_id,
+                action,
+                payload,
+            } => {
+                // Browser wants to forward a request to a claudecodeui client
+                // Find the client's WebSocket
+                let client_ws_opt = {
+                    let clients = self.clients.borrow();
+                    clients.get(&client_id).map(|conn| conn.websocket.clone())
+                };
+
+                if let Some(client_ws) = client_ws_opt {
+                    // Track this pending request so we can route responses back
+                    self.pending_requests.borrow_mut().insert(
+                        request_id.clone(),
+                        PendingRequest {
+                            client_id: client_id.clone(),
+                            browser_ws: ws.clone(),
+                        },
+                    );
+
+                    // Forward as user_request to claudecodeui
+                    let user_request = WsMessage::UserRequest {
+                        request_id,
+                        action,
+                        payload,
+                    };
+                    if let Ok(json) = serde_json::to_string(&user_request) {
+                        let _ = client_ws.send_with_str(&json);
+                    }
+                } else {
+                    // Client not connected - send error back to browser
+                    let error = WsMessage::ForwardedResponse {
+                        client_id,
+                        request_id,
+                        data: serde_json::json!({
+                            "error": true,
+                            "message": "Client not connected"
+                        }),
+                        complete: true,
+                    };
+                    if let Ok(json) = serde_json::to_string(&error) {
+                        let _ = ws.send_with_str(&json);
+                    }
+                }
+            }
+
+            WsMessage::ResponseChunk { request_id, data } => {
+                // Response chunk from claudecodeui - route back to browser
+                let pending = self.pending_requests.borrow();
+                if let Some(req) = pending.get(&request_id) {
+                    let response = WsMessage::ForwardedResponse {
+                        client_id: req.client_id.clone(),
+                        request_id: request_id.clone(),
+                        data,
+                        complete: false,
+                    };
+                    if let Ok(json) = serde_json::to_string(&response) {
+                        let _ = req.browser_ws.send_with_str(&json);
+                    }
+                }
+            }
+
+            WsMessage::ResponseComplete { request_id, data } => {
+                // Response complete from claudecodeui - route back to browser and clean up
+                let pending_req = self.pending_requests.borrow_mut().remove(&request_id);
+                if let Some(req) = pending_req {
+                    let response = WsMessage::ForwardedResponse {
+                        client_id: req.client_id,
+                        request_id,
+                        data: data.unwrap_or(serde_json::json!({"complete": true})),
+                        complete: true,
+                    };
+                    if let Ok(json) = serde_json::to_string(&response) {
+                        let _ = req.browser_ws.send_with_str(&json);
+                    }
+                }
+            }
+
             _ => {
-                // Other message types not handled here
+                // Other message types not handled here (UserRequest, ForwardedResponse are outbound only)
             }
         }
 
