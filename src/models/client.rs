@@ -33,6 +33,9 @@ pub struct ClientMetadata {
     #[serde(default)]
     pub status: ClientStatus,
     pub last_activity: Option<String>,
+    /// Optional HTTP callback URL for direct proxying (e.g., http://localhost:3010 or https://tunnel.ngrok.io)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub callback_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
