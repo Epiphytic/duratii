@@ -513,6 +513,17 @@ pub fn render_client_details(client: &Client) -> String {
         "<span class=\"text-muted\">Client disconnected</span>".to_string()
     };
 
+    // Cache purge button (always available for connected clients with proxy)
+    let purge_cache_btn = [
+        "<button class=\"btn btn-secondary btn-sm\" hx-post=\"/clients/",
+        &id,
+        "/purge-cache\" hx-target=\"#purge-notification-",
+        &id,
+        "\" hx-swap=\"innerHTML\" ",
+        "hx-confirm=\"Purge Cloudflare cache for this client's proxy?\">Purge Cache</button>",
+    ]
+    .concat();
+
     // Build HTML using concat to avoid Rust 2021 raw identifier issues
     [
         "<div class=\"client-card expanded ",
