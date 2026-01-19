@@ -22,11 +22,61 @@ pub struct ProxyResponse {
     pub body: String,
 }
 
+/// Static paths that don't require authentication (PWA resources)
+const PUBLIC_PROXY_PATHS: &[&str] = &[
+    "manifest.json",
+    "sw.js",
+    "favicon.ico",
+];
+
+/// Path prefixes that don't require authentication
+const PUBLIC_PROXY_PREFIXES: &[&str] = &[
+    "icons/",
+];
+
+/// Check if a path is public (no auth required)
+fn is_public_path(path: &str) -> bool {
+    // Normalize path (remove leading slash if present)
+    let normalized = path.strip_prefix('/').unwrap_or(path);
+
+    // Check exact matches
+    if PUBLIC_PROXY_PATHS.contains(&normalized) {
+        return true;
+    }
+
+    // Check prefix matches
+    for prefix in PUBLIC_PROXY_PREFIXES {
+        if normalized.starts_with(prefix) {
+            return true;
+        }
+    }
+
+    false
+}
+
 /// Proxy HTTP requests to claudecodeui instances
 pub async fn proxy_to_client(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
-    // Authenticate user
-    // For fetch requests (non-navigation), return 401 instead of redirect to avoid CORS issues
-    let user = match AuthMiddleware::require_auth(&req, &ctx.env).await? {
+    // Get the proxy path early to check if it's a public resource
+    let proxy_path = ctx.param("path").unwrap_or(&"".to_string()).clone();
+
+    // Get client ID from path parameter
+    let client_id = ctx
+        .param("id")
+        .ok_or("Missing client ID")?
+        .clone();
+
+    // For public paths, try to get user from session but don't require it
+    // If no user, we'll need to look up the client differently (by client_id alone)
+    let user = if is_public_path(&proxy_path) {
+        // For public paths, try auth but allow anonymous access
+        match AuthMiddleware::require_auth(&req, &ctx.env).await? {
+            Ok(user) => Some(user),
+            Err(_) => None, // Allow anonymous access to public paths
+        }
+    } else {
+        // For non-public paths, require authentication
+        // For fetch requests (non-navigation), return 401 instead of redirect to avoid CORS issues
+        match AuthMiddleware::require_auth(&req, &ctx.env).await? {
         Ok(user) => user,
         Err(redirect) => {
             // Check if this is a fetch request (not a page navigation)
