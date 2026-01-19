@@ -764,6 +764,231 @@ fn layout(title: &str, content: &str) -> String {
             padding: 2rem;
             color: var(--text-secondary);
         }}
+
+        /* Section headers */
+        .section-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }}
+
+        .section-header h2 {{
+            margin: 0;
+        }}
+
+        .section-desc {{
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+        }}
+
+        .count-badge {{
+            padding: 0.25rem 0.5rem;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }}
+
+        .count-badge.has-active {{
+            background: rgba(63, 185, 80, 0.2);
+            color: var(--success);
+        }}
+
+        /* Tokens section */
+        .tokens-section {{
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+        }}
+
+        .tokens-grid {{
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }}
+
+        .token-card {{
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+        }}
+
+        .token-card.token-revoked {{
+            opacity: 0.6;
+        }}
+
+        .token-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }}
+
+        .token-name {{
+            font-weight: 600;
+        }}
+
+        .token-id {{
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }}
+
+        .token-meta {{
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+        }}
+
+        .token-actions {{
+            display: flex;
+            gap: 0.5rem;
+        }}
+
+        .empty-state.small {{
+            padding: 1.5rem;
+        }}
+
+        /* Modal */
+        .modal-backdrop {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }}
+
+        .modal {{
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            width: 100%;
+            max-width: 450px;
+            margin: 1rem;
+        }}
+
+        .modal-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }}
+
+        .modal-header h3 {{
+            margin: 0;
+            font-size: 1.125rem;
+        }}
+
+        .modal-close {{
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            line-height: 1;
+        }}
+
+        .modal-close:hover {{
+            color: var(--text-primary);
+        }}
+
+        .modal-body {{
+            padding: 1.5rem;
+        }}
+
+        .modal-footer {{
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+        }}
+
+        .form-group {{
+            margin-bottom: 1rem;
+        }}
+
+        .form-group label {{
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }}
+
+        .form-group input {{
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 1rem;
+        }}
+
+        .form-group input:focus {{
+            outline: none;
+            border-color: var(--accent);
+        }}
+
+        .form-hint {{
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }}
+
+        .success-icon {{
+            font-size: 3rem;
+            color: var(--success);
+            text-align: center;
+            margin-bottom: 1rem;
+        }}
+
+        .token-name-display {{
+            text-align: center;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }}
+
+        .token-display {{
+            display: flex;
+            gap: 0.5rem;
+            align-items: stretch;
+            background: var(--bg-primary);
+            padding: 0.75rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }}
+
+        .token-display code {{
+            flex: 1;
+            font-size: 0.75rem;
+            word-break: break-all;
+            color: var(--accent);
+        }}
+
+        .warning-text {{
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: rgba(210, 153, 34, 0.1);
+            border: 1px solid rgba(210, 153, 34, 0.3);
+            border-radius: 6px;
+            color: var(--warning);
+            font-size: 0.875rem;
+            text-align: center;
+        }}
+
+        .mono {{
+            font-family: monospace;
+        }}
     </style>
 </head>
 <body>
