@@ -26,6 +26,7 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .get_async("/clients/:id", handlers::get_client)
         .get_async("/clients/:id/details", handlers::get_client_details)
         .post_async("/clients/:id/disconnect", handlers::disconnect_client)
+        .post_async("/clients/:id/purge-cache", handlers::purge_client_cache)
         // Token management API (JSON)
         .get_async("/api/tokens", handlers::list_tokens)
         .post_async("/api/tokens", handlers::create_token_api)
