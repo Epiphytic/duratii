@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
+use wasm_bindgen::JsValue;
 use worker::{SqlStorageValue, *};
 
 use crate::models::{Client, ClientMetadata, ClientStatus};
