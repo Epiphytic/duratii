@@ -124,9 +124,11 @@ pub async fn proxy_to_client(mut req: Request, ctx: RouteContext<()>) -> Result<
         }
     }
 
-    // Rewrite URLs in HTML responses to go through the proxy
+    // Rewrite URLs in HTML and JavaScript responses to go through the proxy
     let response_body = if content_type.contains("text/html") {
         rewrite_html_urls(&proxy_resp.body, &client_id)
+    } else if content_type.contains("javascript") {
+        rewrite_js_urls(&proxy_resp.body, &client_id)
     } else {
         proxy_resp.body
     };
