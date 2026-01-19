@@ -600,18 +600,52 @@ impl UserHub {
                         let _ = client_ws.send_with_str(&json);
                     }
                 } else {
-                    // Client not connected - send error back to browser
-                    let error = WsMessage::ForwardedResponse {
-                        client_id,
-                        request_id,
-                        data: serde_json::json!({
-                            "error": true,
-                            "message": "Client not connected"
-                        }),
-                        complete: true,
-                    };
-                    if let Ok(json) = serde_json::to_string(&error) {
-                        let _ = ws.send_with_str(&json);
+                    // Client WebSocket not in memory - check if they're in SQLite
+                    // This can happen after hibernation: SQLite shows "connected" but
+                    // the actual WebSocket was lost. Mark them as disconnected.
+                    let client_in_sqlite = self.load_clients_from_sqlite()
+                        .ok()
+                        .and_then(|clients| clients.into_iter().find(|c| c.id == client_id));
+
+                    if let Some(mut stale_client) = client_in_sqlite {
+                        // Client was in SQLite but WebSocket is gone - mark as disconnected
+                        stale_client.update_status(ClientStatus::Disconnected);
+                        let _ = self.save_client(&stale_client);
+
+                        // Broadcast status change to browsers
+                        if let Ok(json) = serde_json::to_string(&WsMessage::ClientUpdate {
+                            client: stale_client,
+                        }) {
+                            self.broadcast_to_browsers(&json);
+                        }
+
+                        // Send error back to browser
+                        let error = WsMessage::ForwardedResponse {
+                            client_id,
+                            request_id,
+                            data: serde_json::json!({
+                                "error": true,
+                                "message": "Client is offline (connection lost after hibernation)"
+                            }),
+                            complete: true,
+                        };
+                        if let Ok(json) = serde_json::to_string(&error) {
+                            let _ = ws.send_with_str(&json);
+                        }
+                    } else {
+                        // Client not found at all
+                        let error = WsMessage::ForwardedResponse {
+                            client_id,
+                            request_id,
+                            data: serde_json::json!({
+                                "error": true,
+                                "message": "Client not found"
+                            }),
+                            complete: true,
+                        };
+                        if let Ok(json) = serde_json::to_string(&error) {
+                            let _ = ws.send_with_str(&json);
+                        }
                     }
                 }
             }
