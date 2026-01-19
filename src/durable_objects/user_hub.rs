@@ -349,20 +349,27 @@ impl UserHub {
             return Response::error("Expected websocket", 426);
         }
 
-        // Check if this is a browser connection (via query param)
+        // Parse query parameters
         let url = req.url()?;
         let is_browser = url.query_pairs().any(|(k, v)| k == "type" && v == "browser");
+        let client_id: Option<String> = url
+            .query_pairs()
+            .find(|(k, _)| k == "client_id")
+            .map(|(_, v)| v.to_string());
 
         let pair = WebSocketPair::new()?;
         let server = pair.server;
         let client = pair.client;
 
-        // Use hibernation API for WebSocket acceptance (don't call server.accept())
-        // This enables automatic wake-up on WebSocket messages
+        // Use hibernation API for WebSocket acceptance with tags for recovery
+        // Tags allow us to identify WebSockets after hibernation
         if is_browser {
             self.state.accept_websocket_with_tags(&server, &["browser"]);
+        } else if let Some(id) = client_id {
+            // Tag client WebSocket with its client_id for hibernation recovery
+            self.state.accept_websocket_with_tags(&server, &[&id]);
         } else {
-            // Client connections get tagged after registration
+            // Legacy: no client_id provided (shouldn't happen with updated claudecodeui)
             self.state.accept_web_socket(&server);
         }
 
