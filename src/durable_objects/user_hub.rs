@@ -494,8 +494,14 @@ impl UserHub {
                     }
                 }
 
-                // Get clients from memory first, but also check SQLite for any
-                // clients that might have reconnected since hibernation
+                // Get clients with active WebSocket connections from memory
+                let active_client_ids: std::collections::HashSet<String> = self
+                    .clients
+                    .borrow()
+                    .keys()
+                    .cloned()
+                    .collect();
+
                 let mut clients: Vec<Client> = self
                     .clients
                     .borrow()
@@ -503,11 +509,18 @@ impl UserHub {
                     .map(|c| c.client.clone())
                     .collect();
 
-                // If no clients in memory, try loading from SQLite
-                // (clients may have registered but DO hibernated)
-                if clients.is_empty() {
-                    if let Ok(stored) = self.load_clients_from_sqlite() {
-                        clients = stored;
+                // Check SQLite for any clients that might be stale
+                // Mark them as disconnected if their WebSocket is not in memory
+                if let Ok(stored) = self.load_clients_from_sqlite() {
+                    for mut stored_client in stored {
+                        if !active_client_ids.contains(&stored_client.id) {
+                            // Client in SQLite but not in memory - mark as disconnected
+                            if !matches!(stored_client.metadata.status, ClientStatus::Disconnected) {
+                                stored_client.update_status(ClientStatus::Disconnected);
+                                let _ = self.save_client(&stored_client);
+                            }
+                            clients.push(stored_client);
+                        }
                     }
                 }
 
