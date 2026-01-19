@@ -500,12 +500,23 @@ impl UserHub {
     }
 
     fn get_clients_json(&self) -> Result<Response> {
-        let clients: Vec<Client> = self
+        // Restore state if waking from hibernation
+        let _ = self.ensure_state_restored();
+
+        let mut clients: Vec<Client> = self
             .clients
             .borrow()
             .values()
             .map(|c| c.client.clone())
             .collect();
+
+        // If no clients in memory, try loading from SQLite
+        if clients.is_empty() {
+            if let Ok(stored) = self.load_clients_from_sqlite() {
+                clients = stored;
+            }
+        }
+
         Response::from_json(&clients)
     }
 
