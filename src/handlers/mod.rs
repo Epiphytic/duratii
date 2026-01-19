@@ -26,7 +26,7 @@ pub async fn home(req: Request, ctx: RouteContext<()>) -> Result<Response> {
     match AuthMiddleware::require_auth(&req, &ctx.env).await? {
         Ok(_user) => {
             // User is logged in, redirect to dashboard
-            let mut headers = Headers::new();
+            let headers = Headers::new();
             headers.set("Location", "/dashboard")?;
             Ok(Response::empty()?.with_status(302).with_headers(headers))
         }
