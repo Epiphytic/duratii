@@ -16,6 +16,8 @@ wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
 getrandom = { version = "0.2", features = ["js"] }
+futures = "0.3"
+js-sys = "0.3"
 
 [profile.release]
 opt-level = "s"
