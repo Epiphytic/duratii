@@ -128,6 +128,47 @@ function updateClientCount(clients) {
     }
 }
 
+// Store client info for quick lookup
+let clientsMap = {};
+
+function connectToClient(clientId) {
+    const client = clientsMap[clientId];
+    if (client && client.metadata && client.metadata.url) {
+        // Open claudecodeui in new tab if URL is available
+        window.open(client.metadata.url, '_blank');
+    } else {
+        // Send connect request through WebSocket
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: 'connect_client',
+                client_id: clientId
+            }));
+        }
+        // Show a notification that connection is being established
+        showNotification('Connecting to ' + clientId + '...');
+    }
+}
+
+function showNotification(message) {
+    // Create a simple toast notification
+    const existing = document.querySelector('.toast-notification');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => toast.classList.add('show'), 10);
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Update clients map when we receive client list
+const originalOnMessage = null;
+
 connectWebSocket();
 </script>"#;
 
