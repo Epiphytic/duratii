@@ -863,4 +863,107 @@ impl UserHub {
             Response::error("Client not found", 404)
         }
     }
+
+    /// Handle HTTP proxy requests to claudecodeui instances
+    async fn handle_proxy(&self, mut req: Request, client_id: &str) -> Result<Response> {
+        // Restore state if waking from hibernation
+        let _ = self.ensure_state_restored();
+
+        // Parse the proxy request from the body
+        let body_text = req.text().await?;
+        let proxy_req: ProxyRequest = serde_json::from_str(&body_text)
+            .map_err(|e| Error::RustError(format!("Invalid proxy request: {}", e)))?;
+
+        // Find the client - first check in-memory, then SQLite
+        let callback_url = {
+            let clients = self.clients.borrow();
+            if let Some(conn) = clients.get(client_id) {
+                conn.client.metadata.callback_url.clone()
+            } else {
+                // Try to load from SQLite (client might be disconnected but have a URL)
+                drop(clients);
+                self.load_clients_from_sqlite()
+                    .ok()
+                    .and_then(|clients| {
+                        clients.into_iter()
+                            .find(|c| c.id == client_id)
+                            .and_then(|c| c.metadata.callback_url)
+                    })
+            }
+        };
+
+        let callback_url = match callback_url {
+            Some(url) => url,
+            None => {
+                return Response::from_json(&ProxyResponse {
+                    status: 503,
+                    headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                    body: r#"{"error": "Client does not have a callback URL configured. Set ORCHESTRATOR_CALLBACK_URL in claudecodeui."}"#.to_string(),
+                });
+            }
+        };
+
+        // Build the target URL
+        let target_url = if let Some(query) = &proxy_req.query {
+            format!("{}{}?{}", callback_url.trim_end_matches('/'), proxy_req.path, query)
+        } else {
+            format!("{}{}", callback_url.trim_end_matches('/'), proxy_req.path)
+        };
+
+        // Build the fetch request
+        let method = match proxy_req.method.to_uppercase().as_str() {
+            "GET" => Method::Get,
+            "POST" => Method::Post,
+            "PUT" => Method::Put,
+            "DELETE" => Method::Delete,
+            "PATCH" => Method::Patch,
+            "HEAD" => Method::Head,
+            "OPTIONS" => Method::Options,
+            _ => Method::Get,
+        };
+
+        let mut init = RequestInit::new();
+        init.with_method(method);
+
+        // Set headers
+        let headers = Headers::new();
+        for (key, value) in &proxy_req.headers {
+            let _ = headers.set(key, value);
+        }
+        init.with_headers(headers);
+
+        // Set body if present
+        if let Some(body) = proxy_req.body {
+            init.with_body(Some(JsValue::from_str(&body)));
+        }
+
+        // Make the fetch request to the claudecodeui instance
+        let fetch_req = Request::new_with_init(&target_url, &init)?;
+        let mut fetch_resp = match Fetch::Request(fetch_req).send().await {
+            Ok(resp) => resp,
+            Err(e) => {
+                return Response::from_json(&ProxyResponse {
+                    status: 502,
+                    headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                    body: format!(r#"{{"error": "Failed to connect to claudecodeui: {}"}}"#, e),
+                });
+            }
+        };
+
+        // Collect response headers
+        let mut resp_headers: Vec<(String, String)> = Vec::new();
+        for (key, value) in fetch_resp.headers() {
+            resp_headers.push((key, value));
+        }
+
+        // Get response body as text
+        let resp_body = fetch_resp.text().await.unwrap_or_default();
+
+        // Return the proxied response
+        Response::from_json(&ProxyResponse {
+            status: fetch_resp.status_code(),
+            headers: resp_headers,
+            body: resp_body,
+        })
+    }
 }
