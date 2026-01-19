@@ -246,14 +246,14 @@ impl DurableObject for UserHub {
         _reason: String,
         _was_clean: bool,
     ) -> Result<()> {
-        self.handle_close(&ws);
+        self.handle_close(&ws).await;
         Ok(())
     }
 
     /// Handle WebSocket errors (hibernation API)
     async fn websocket_error(&self, ws: WebSocket, _error: Error) -> Result<()> {
         // Treat errors as disconnections
-        self.handle_close(&ws);
+        self.handle_close(&ws).await;
         Ok(())
     }
 }
