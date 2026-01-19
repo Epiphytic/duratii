@@ -64,6 +64,40 @@ pub enum WsMessage {
         #[serde(skip_serializing_if = "Option::is_none")]
         message: Option<String>,
     },
+    // ============ Message Forwarding (Browser <-> claudecodeui) ============
+    /// Forward a request to a claudecodeui client (from browser)
+    ForwardToClient {
+        client_id: String,
+        request_id: String,
+        action: String,
+        #[serde(default)]
+        payload: serde_json::Value,
+    },
+    /// User request forwarded to claudecodeui (orchestrator -> claudecodeui)
+    UserRequest {
+        request_id: String,
+        action: String,
+        #[serde(default)]
+        payload: serde_json::Value,
+    },
+    /// Response chunk from claudecodeui (claudecodeui -> orchestrator)
+    ResponseChunk {
+        request_id: String,
+        data: serde_json::Value,
+    },
+    /// Response complete from claudecodeui (claudecodeui -> orchestrator)
+    ResponseComplete {
+        request_id: String,
+        #[serde(default)]
+        data: Option<serde_json::Value>,
+    },
+    /// Forwarded response to browser (orchestrator -> browser)
+    ForwardedResponse {
+        client_id: String,
+        request_id: String,
+        data: serde_json::Value,
+        complete: bool,
+    },
 }
 
 struct ClientConnection {
