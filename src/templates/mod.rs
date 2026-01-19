@@ -1431,6 +1431,27 @@ fn layout(title: &str, content: &str) -> String {
             opacity: 1;
         }}
 
+        /* Toast success (for cache purge) */
+        .toast-success {{
+            padding: 0.5rem 1rem;
+            background: rgba(63, 185, 80, 0.15);
+            border: 1px solid rgba(63, 185, 80, 0.4);
+            border-radius: 6px;
+            color: var(--success);
+            font-size: 0.875rem;
+            margin-top: 0.75rem;
+            animation: fadeIn 0.3s ease;
+        }}
+
+        @keyframes fadeIn {{
+            from {{ opacity: 0; transform: translateY(-10px); }}
+            to {{ opacity: 1; transform: translateY(0); }}
+        }}
+
+        .purge-notification {{
+            min-height: 0;
+        }}
+
         .last-seen, .last-activity {{
             font-size: 0.75rem;
             color: var(--text-secondary);
