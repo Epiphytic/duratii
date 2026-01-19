@@ -76,15 +76,17 @@ function connectWebSocket() {
         const msg = JSON.parse(event.data);
 
         if (msg.type === 'client_update') {
-            const clientId = msg.client.id;
-            const clientCard = document.getElementById('client-' + clientId);
+            const client = msg.client;
+            clientsMap[client.id] = client;
+            const clientCard = document.getElementById('client-' + client.id);
             if (clientCard) {
                 htmx.trigger(clientCard, 'refresh');
             } else {
                 htmx.trigger('#clients-list', 'load');
             }
-            updateClientCount();
+            updateClientCount(Object.values(clientsMap));
         } else if (msg.type === 'client_disconnected') {
+            delete clientsMap[msg.client_id];
             const clientCard = document.getElementById('client-' + msg.client_id);
             if (clientCard) {
                 clientCard.style.opacity = '0.5';
@@ -93,12 +95,21 @@ function connectWebSocket() {
                     htmx.trigger('#clients-list', 'load');
                 }, 300);
             }
-            updateClientCount();
+            updateClientCount(Object.values(clientsMap));
         } else if (msg.type === 'client_list') {
+            // Build clients map for quick lookup
+            clientsMap = {};
+            msg.clients.forEach(c => clientsMap[c.id] = c);
             updateClientCount(msg.clients);
             // Refresh the client list to show the cards
             if (msg.clients && msg.clients.length > 0) {
                 htmx.trigger('#clients-list', 'load');
+            }
+        } else if (msg.type === 'connect_response') {
+            if (msg.success && msg.url) {
+                window.open(msg.url, '_blank');
+            } else {
+                showNotification(msg.message || 'Unable to connect to client');
             }
         }
     };
