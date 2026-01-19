@@ -67,7 +67,7 @@ pub async fn websocket_upgrade(req: Request, ctx: RouteContext<()>) -> Result<Re
             .prepare(
                 "SELECT user_id, token_hash FROM client_tokens WHERE id = ?1 AND revoked_at IS NULL",
             )
-            .bind(&[token_id.into()])?
+            .bind(&[token_id.clone().into()])?
             .first::<TokenRow>(None)
             .await?;
 
