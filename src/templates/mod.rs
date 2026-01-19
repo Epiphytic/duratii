@@ -380,7 +380,7 @@ pub fn render_token_card(token: &TokenInfo) -> String {
 
 /// Render the token creation modal
 pub fn render_token_modal() -> String {
-    r#"
+    r##"
     <div class="modal-backdrop" id="modal-backdrop">
         <div class="modal">
             <div class="modal-header">
@@ -402,7 +402,7 @@ pub fn render_token_modal() -> String {
             </form>
         </div>
     </div>
-    "#
+    "##
     .to_string()
 }
 
