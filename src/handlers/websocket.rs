@@ -97,7 +97,10 @@ pub async fn websocket_upgrade(req: Request, ctx: RouteContext<()>) -> Result<Re
         init.with_method(Method::Get);
         init.with_headers(headers);
 
-        let do_req = Request::new_with_init("https://do/ws", &init)?;
+        // Include client_id in the DO request URL for hibernation-aware tagging
+        let client_id = params.get("client_id").cloned().unwrap_or_default();
+        let do_url = format!("https://do/ws?client_id={}", client_id);
+        let do_req = Request::new_with_init(&do_url, &init)?;
         stub.fetch_with_request(do_req).await
     }
 }
