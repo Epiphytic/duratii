@@ -124,14 +124,8 @@ pub async fn proxy_to_client(mut req: Request, ctx: RouteContext<()>) -> Result<
         }
     }
 
-    // Rewrite URLs in HTML and JavaScript responses to go through the proxy
-    let response_body = if content_type.contains("text/html") {
-        rewrite_html_urls(&proxy_resp.body, &client_id)
-    } else if content_type.contains("javascript") {
-        rewrite_js_urls(&proxy_resp.body, &client_id)
-    } else {
-        proxy_resp.body
-    };
+    // URL rewriting is now handled by claudecodeui (it receives proxy_base in the request)
+    let response_body = proxy_resp.body;
 
     // Create response with the proxied status and body
     // We need to create a new response with the correct status
