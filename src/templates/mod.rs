@@ -435,23 +435,23 @@ pub fn render_client_card(client: &Client) -> String {
     let is_connected = !matches!(client.metadata.status, ClientStatus::Disconnected);
     let connect_class = if is_connected { "clickable" } else { "" };
 
-    // Build HTML - whole card is clickable to connect
+    // Build HTML - title is clickable to open proxy interface
     [
-        "<div class=\"client-card ",
-        connect_class,
-        "\" id=\"client-",
+        "<div class=\"client-card\" id=\"client-",
         &id,
         "\" hx-get=\"/clients/",
         &id,
         "\" hx-trigger=\"refresh from:body\" data-client-id=\"",
         &id,
-        "\" onclick=\"connectToClient('",
-        &id,
-        "')\">",
+        "\">",
         "<div class=\"client-header\">",
-        "<span class=\"client-title\">",
+        "<a href=\"/clients/",
         &id,
-        "</span>",
+        "/proxy/\" class=\"client-title ",
+        connect_class,
+        "\" target=\"_blank\">",
+        &id,
+        "</a>",
         "<div class=\"header-right\">",
         "<span class=\"status-badge ",
         status_class,
