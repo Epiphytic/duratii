@@ -1,38 +1,16 @@
-# Cloudflare Skills
+🌀 duratii
+The Tethered Orchestrator.
+"A persistent, real-time companion that wraps around your AI engine."
 
-A collection of [Agent Skills](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills) for building on Cloudflare, Workers, the Agents SDK, and the wider Cloudflare Developer Platform.
+Duratii is the mobile-first orchestration layer for your development ecosystem. It acts as the "nervous system" for the heavy lifting done by claudecodeui, providing a persistent, bi-directional interface that travels with you.
 
-## Installing Skills
+Like Tillandsia duratii—which is famous for growing "prehensile" leaves that curl around branches to secure a position—this tool uses persistent connections to wrap around your compute instances, allowing you to manage complex AI workflows from a simple mobile interface.
 
-These skills work with any agent that supports the Agent Skills standard, including Claude Code, OpenCode, OpenAI Codex, and Pi.
+The Anatomy
+🔗 Persistent Tendrils (WebSockets) Forget stateless requests. Duratii maintains active, bi-directional WebSocket connections to your claudecodeui instances. It creates a "live wire" between your mobile device and your dev environment, streaming output and capturing input in real-time.
 
-Copy the skill directories you need to the appropriate location for your agent:
+🏗️ Epiphytic Structure It does not try to be the IDE. It relies on siteboon/claudecodeui for the heavy lifting and code execution. Duratii is simply the lightweight, adaptive layer that floats above it, translating that raw power into a mobile-friendly orchestration experience.
 
-| Agent | Skill Directory | Docs |
-|-------|-----------------|------|
-| Claude Code | `~/.claude/skills/` | [docs](https://code.claude.com/docs/en/skills) |
-| OpenCode | `~/.config/opencode/skill/` | [docs](https://opencode.ai/docs/skills/) |
-| OpenAI Codex | `~/.codex/skills/` | [docs](https://developers.openai.com/codex/skills/) |
-| Pi | `~/.pi/agent/skills/` | [docs](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent#skills) |
+📱 The Companion View Designed for the developer who is moving. Whether you are walking the dog or in transit, Duratii keeps the context of your AI sessions alive, allowing you to guide the generation process without being tethered to a desktop.
 
-## Skills
-
-| Skill | Useful for | Directory |
-|-------|------------|-----------|
-| agents-sdk | Building stateful AI agents with state, scheduling, RPC, MCP servers, email, and streaming chat | `agents-sdk/` |
-| durable-objects | Stateful coordination (chat rooms, games, booking), RPC, SQLite, alarms, WebSockets | `durable-objects/` |
-| wrangler | Deploying and managing Workers, KV, R2, D1, Vectorize, Queues, Workflows | `wrangler/` |
-| web-perf | Auditing Core Web Vitals (FCP, LCP, TBT, CLS), render-blocking resources, network chains | `web-perf/` |
-| building-mcp-server-on-cloudflare | Building remote MCP servers with tools, OAuth, and deployment | `building-mcp-server-on-cloudflare/` |
-| building-ai-agent-on-cloudflare | Building AI agents with state, WebSockets, and tool integration | `building-ai-agent-on-cloudflare/` |
-
-## Usage
-
-When a request matches a skill's triggers, the agent loads and applies the relevant skill to provide accurate, up-to-date guidance.
-
-## Resources
-
-- [Cloudflare Agents Documentation](https://developers.cloudflare.com/agents/)
-- [Cloudflare MCP Guide](https://developers.cloudflare.com/agents/model-context-protocol/)
-- [Agents SDK Repository](https://github.com/cloudflare/agents)
-- [Agents Starter Template](https://github.com/cloudflare/agents-starter)
+Dependencies: siteboon/claudecodeui Protocol: wss://
