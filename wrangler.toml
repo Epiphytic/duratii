@@ -13,13 +13,13 @@ bindings = [{ name = "USER_HUB", class_name = "UserHub" }]
 tag = "v1"
 new_sqlite_classes = ["UserHub"]
 
-# D1 Database binding
+# D1 Database binding (development)
 [[d1_databases]]
 binding = "DB"
 database_name = "orchestrator-db"
 database_id = "d50e199d-15ce-4061-813a-20d091ddc0c2"
 
-# R2 bucket for static assets
+# R2 bucket for static assets (development)
 [[r2_buckets]]
 binding = "ASSETS"
 bucket_name = "orchestrator-assets"
@@ -34,18 +34,30 @@ GITHUB_CLIENT_ID = "Ov23liCmLw4EzqdaoEXD"
 ALLOWED_ORGS = ""
 ALLOWED_USERS = "liamhelmer"
 ALLOWED_TEAMS = ""
+ENVIRONMENT = "development"
 
-# Development environment
-[env.dev]
-name = "ai-orchestrator-dev"
-vars = { ENVIRONMENT = "development" }
-
-# Staging environment
-[env.staging]
-name = "ai-orchestrator-staging"
-vars = { ENVIRONMENT = "staging" }
-
+# =============================================================================
 # Production environment
+# Deploy with: wrangler deploy --env production
+# URL: https://ai-orchestrator-prod.liam-helmer-428.workers.dev (or custom domain)
+# =============================================================================
 [env.production]
-name = "ai-orchestrator"
-vars = { ENVIRONMENT = "production" }
+name = "ai-orchestrator-prod"
+
+[env.production.vars]
+GITHUB_CLIENT_ID = "Ov23liCmLw4EzqdaoEXD"
+ALLOWED_ORGS = ""
+ALLOWED_USERS = "liamhelmer"
+ALLOWED_TEAMS = ""
+ENVIRONMENT = "production"
+
+# Production D1 database (create with: wrangler d1 create orchestrator-db-prod)
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "orchestrator-db-prod"
+database_id = "REPLACE_WITH_PROD_DB_ID"
+
+# Production R2 bucket (create with: wrangler r2 bucket create orchestrator-assets-prod)
+[[env.production.r2_buckets]]
+binding = "ASSETS"
+bucket_name = "orchestrator-assets-prod"
