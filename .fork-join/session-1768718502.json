@@ -12,6 +12,14 @@
     {
       "prompt": "change the upstream for this project to be https://github.com/Epiphytic/duratii. Move all the code and branches over to the new repository, and push them all up",
       "timestamp": "2026-01-20 19:26:24 UTC"
+    },
+    {
+      "prompt": "The @building-ai-agent-on-cloudflare/ @building-mcp-server-on-cloudflare/ @agents-sdk/ were actually supposed to be installed as claude skills into  the .claude structure. Find the best practices for this, and move them to the correct place",
+      "timestamp": "2026-01-20 19:28:40 UTC"
+    },
+    {
+      "prompt": "No, this is not a claude plugin. remove the .claude-plugin directory",
+      "timestamp": "2026-01-20 19:30:09 UTC"
     }
   ]
 }
