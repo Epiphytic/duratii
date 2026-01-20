@@ -25,6 +25,12 @@ struct PurgeCacheByPrefixRequest {
 }
 
 /// Purge Cloudflare cache for a specific client's proxy URLs
+///
+/// Note: This feature requires:
+/// 1. A custom domain (not workers.dev) with its own Cloudflare Zone
+/// 2. CLOUDFLARE_ZONE_ID secret set to the Zone ID
+/// 3. CLOUDFLARE_API_TOKEN secret with Cache Purge permission
+/// 4. Enterprise plan for prefix-based purging (or use purge_everything for other plans)
 pub async fn purge_client_cache(req: Request, ctx: RouteContext<()>) -> Result<Response> {
     // Check authentication
     let _user = match AuthMiddleware::require_auth(&req, &ctx.env).await? {
@@ -34,6 +40,30 @@ pub async fn purge_client_cache(req: Request, ctx: RouteContext<()>) -> Result<R
 
     // Get client ID from path parameter
     let client_id = ctx.param("id").ok_or("Missing client ID")?.clone();
+
+    // Check if we're on workers.dev (no cache purge available)
+    let url = req.url()?;
+    let host = url.host_str().unwrap_or("");
+    if host.ends_with(".workers.dev") {
+        // Check if this is an HTMX request
+        let is_htmx = req.headers().get("HX-Request")?.is_some();
+
+        if is_htmx {
+            return Response::from_html(format!(
+                r#"<div class="toast-warning" id="purge-toast">
+                    Cache purge not available on workers.dev. Use a custom domain for this feature.
+                    <script>
+                        setTimeout(() => document.getElementById('purge-toast')?.remove(), 5000);
+                    </script>
+                </div>"#
+            ));
+        } else {
+            return Response::error(
+                "Cache purge not available on workers.dev subdomains. Configure a custom domain with CLOUDFLARE_ZONE_ID and CLOUDFLARE_API_TOKEN secrets.",
+                501,
+            );
+        }
+    }
 
     // Get Cloudflare credentials from environment
     let zone_id = match ctx.env.secret("CLOUDFLARE_ZONE_ID") {
@@ -61,9 +91,6 @@ pub async fn purge_client_cache(req: Request, ctx: RouteContext<()>) -> Result<R
     let prefix = format!("/clients/{}/proxy/", client_id);
 
     // We need the full URL with hostname for Cloudflare's purge API
-    // Get the hostname from the request
-    let url = req.url()?;
-    let host = url.host_str().unwrap_or("ai-orchestrator.liam-helmer-428.workers.dev");
     let scheme = url.scheme();
 
     let full_prefix = format!("{}://{}{}", scheme, host, prefix);
