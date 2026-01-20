@@ -5,7 +5,7 @@ mod proxy;
 mod tokens;
 mod websocket;
 
-pub use clients::{disconnect_client, get_client, get_client_details, get_clients};
+pub use clients::{disconnect_client, get_client, get_client_details, get_client_ws_info, get_clients};
 pub use cloudflare::purge_client_cache;
 pub use dashboard::dashboard;
 pub use proxy::proxy_to_client;
