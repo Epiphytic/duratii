@@ -46,6 +46,13 @@ ENVIRONMENT = "development"
 [env.production]
 name = "duratii-prod"
 
+[env.production.durable_objects]
+bindings = [{ name = "USER_HUB", class_name = "UserHub" }]
+
+[[env.production.migrations]]
+tag = "v1"
+new_sqlite_classes = ["UserHub"]
+
 [env.production.vars]
 GITHUB_CLIENT_ID = "Ov23liCmLw4EzqdaoEXD"
 ALLOWED_ORGS = "epiphylic"
@@ -57,7 +64,7 @@ ENVIRONMENT = "production"
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "duratii-db-prod"
-database_id = "REPLACE_WITH_PROD_DB_ID"
+database_id = "17fe1c17-a87c-4e9e-9df3-79dc5df6ab97"
 
 # Production R2 bucket (create with: wrangler r2 bucket create duratii-assets-prod)
 [[env.production.r2_buckets]]
