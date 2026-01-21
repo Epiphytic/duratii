@@ -9,7 +9,6 @@ pub fn render_home() -> String {
             <div class="login-logo">
                 <img src="/static/emblem.png" alt="Duratii" class="logo-emblem">
             </div>
-            <h1 class="brand-title">duratii</h1>
             <p class="brand-tagline">The Tethered Orchestrator</p>
             <p>Manage your Claude Code instances from a unified mobile interface.</p>
             <a href="/auth/github" class="btn btn-primary">
@@ -29,10 +28,9 @@ pub fn render_dashboard(user: &User) -> String {
 
     let content = [
         "<header class=\"dashboard-header\">",
-        "<div class=\"brand-header\">",
-        "<img src=\"/static/emblem.png\" alt=\"\" class=\"header-emblem\">",
-        "<h1>duratii</h1>",
-        "</div>",
+        "<a href=\"/dashboard\" class=\"brand-header\">",
+        "<img src=\"/static/emblem.png\" alt=\"Duratii\" class=\"header-emblem\">",
+        "</a>",
         "<div class=\"user-info\">",
         "<span>", &username, "</span>",
         "<a href=\"/auth/logout\" class=\"btn btn-secondary\">Logout</a>",
@@ -382,10 +380,9 @@ pub fn render_clients_page(user: &User, clients: &[Client]) -> String {
         &format!(
             r#"
             <header class="dashboard-header">
-                <div class="brand-header">
-                    <img src="/static/emblem.png" alt="" class="header-emblem">
-                    <h1>duratii</h1>
-                </div>
+                <a href="/dashboard" class="brand-header">
+                    <img src="/static/emblem.png" alt="Duratii" class="header-emblem">
+                </a>
                 <div class="user-info">
                     <span>{}</span>
                     <a href="/auth/logout" class="btn btn-secondary">Logout</a>
@@ -804,22 +801,15 @@ fn layout(title: &str, content: &str) -> String {
         }}
 
         .logo-emblem {{
-            width: 120px;
-            height: 120px;
+            max-width: 280px;
+            width: 100%;
+            height: auto;
             object-fit: contain;
             filter: drop-shadow(0 0 20px rgba(63, 185, 80, 0.3));
         }}
 
-        .brand-title {{
-            font-size: 3rem;
-            font-weight: 300;
-            color: #7ee787;
-            margin-bottom: 0.25rem;
-            letter-spacing: 0.05em;
-        }}
-
         .brand-tagline {{
-            font-size: 1rem;
+            font-size: 1.1rem;
             color: var(--text-secondary);
             font-style: italic;
             margin-bottom: 1.5rem;
@@ -885,20 +875,13 @@ fn layout(title: &str, content: &str) -> String {
         .brand-header {{
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            text-decoration: none;
         }}
 
         .header-emblem {{
-            width: 36px;
-            height: 36px;
+            height: 32px;
+            width: auto;
             object-fit: contain;
-        }}
-
-        .dashboard-header h1 {{
-            font-size: 1.5rem;
-            color: #7ee787;
-            font-weight: 400;
-            letter-spacing: 0.03em;
         }}
 
         .user-info {{
@@ -1488,21 +1471,15 @@ fn layout(title: &str, content: &str) -> String {
 
         @media (max-width: 480px) {{
             .logo-emblem {{
-                width: 80px;
-                height: 80px;
-            }}
-
-            .brand-title {{
-                font-size: 2.25rem;
+                max-width: 200px;
             }}
 
             .brand-tagline {{
-                font-size: 0.875rem;
+                font-size: 0.9rem;
             }}
 
             .header-emblem {{
-                width: 28px;
-                height: 28px;
+                height: 26px;
             }}
 
             .login-container h1 {{
