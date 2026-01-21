@@ -1,8 +1,8 @@
 [package]
-name = "ai-orchestrator"
+name = "duratii"
 version = "0.1.0"
 edition = "2021"
-authors = ["AI Orchestrator Team"]
+authors = ["Epiphytic"]
 description = "A lightweight orchestrator for managing multiple Claude Code instances"
 
 [lib]

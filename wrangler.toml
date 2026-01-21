@@ -1,4 +1,4 @@
-name = "ai-orchestrator"
+name = "duratii"
 main = "build/worker/shim.mjs"
 compatibility_date = "2024-01-01"
 
@@ -14,12 +14,14 @@ tag = "v1"
 new_sqlite_classes = ["UserHub"]
 
 # D1 Database binding (development)
+# Note: Using existing database, can be renamed later if needed
 [[d1_databases]]
 binding = "DB"
 database_name = "orchestrator-db"
 database_id = "d50e199d-15ce-4061-813a-20d091ddc0c2"
 
 # R2 bucket for static assets (development)
+# Note: Using existing bucket, can be renamed later if needed
 [[r2_buckets]]
 binding = "ASSETS"
 bucket_name = "orchestrator-assets"
@@ -39,25 +41,25 @@ ENVIRONMENT = "development"
 # =============================================================================
 # Production environment
 # Deploy with: wrangler deploy --env production
-# URL: https://ai-orchestrator-prod.liam-helmer-428.workers.dev (or custom domain)
+# URL: https://duratii-prod.liam-helmer-428.workers.dev (or custom domain)
 # =============================================================================
 [env.production]
-name = "ai-orchestrator-prod"
+name = "duratii-prod"
 
 [env.production.vars]
 GITHUB_CLIENT_ID = "Ov23liCmLw4EzqdaoEXD"
-ALLOWED_ORGS = ""
-ALLOWED_USERS = "liamhelmer"
+ALLOWED_ORGS = "epiphylic"
+ALLOWED_USERS = ""
 ALLOWED_TEAMS = ""
 ENVIRONMENT = "production"
 
-# Production D1 database (create with: wrangler d1 create orchestrator-db-prod)
+# Production D1 database (create with: wrangler d1 create duratii-db-prod)
 [[env.production.d1_databases]]
 binding = "DB"
-database_name = "orchestrator-db-prod"
+database_name = "duratii-db-prod"
 database_id = "REPLACE_WITH_PROD_DB_ID"
 
-# Production R2 bucket (create with: wrangler r2 bucket create orchestrator-assets-prod)
+# Production R2 bucket (create with: wrangler r2 bucket create duratii-assets-prod)
 [[env.production.r2_buckets]]
 binding = "ASSETS"
-bucket_name = "orchestrator-assets-prod"
+bucket_name = "duratii-assets-prod"
