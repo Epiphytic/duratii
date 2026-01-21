@@ -3,11 +3,15 @@ use crate::models::{Client, ClientStatus, TokenInfo, User};
 /// Render the home/login page
 pub fn render_home() -> String {
     layout(
-        "AI Orchestrator",
+        "Duratii - The Tethered Orchestrator",
         r#"
         <div class="login-container">
-            <h1>AI Orchestrator</h1>
-            <p>Manage your Claude Code instances from a unified interface.</p>
+            <div class="login-logo">
+                <img src="/static/emblem.png" alt="Duratii" class="logo-emblem">
+            </div>
+            <h1 class="brand-title">duratii</h1>
+            <p class="brand-tagline">The Tethered Orchestrator</p>
+            <p>Manage your Claude Code instances from a unified mobile interface.</p>
             <a href="/auth/github" class="btn btn-primary">
                 <svg class="icon" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
@@ -25,7 +29,10 @@ pub fn render_dashboard(user: &User) -> String {
 
     let content = [
         "<header class=\"dashboard-header\">",
-        "<h1>AI Orchestrator</h1>",
+        "<div class=\"brand-header\">",
+        "<img src=\"/static/emblem.png\" alt=\"\" class=\"header-emblem\">",
+        "<h1>duratii</h1>",
+        "</div>",
         "<div class=\"user-info\">",
         "<span>", &username, "</span>",
         "<a href=\"/auth/logout\" class=\"btn btn-secondary\">Logout</a>",
@@ -52,7 +59,7 @@ pub fn render_dashboard(user: &User) -> String {
         DASHBOARD_SCRIPT,
     ].concat();
 
-    layout("Dashboard - AI Orchestrator", &content)
+    layout("Dashboard - Duratii", &content)
 }
 
 const DASHBOARD_SCRIPT: &str = r#"<script>
@@ -371,11 +378,14 @@ connectWebSocket();
 /// Render the clients page (full page, used for non-HTMX requests)
 pub fn render_clients_page(user: &User, clients: &[Client]) -> String {
     layout(
-        "Clients - AI Orchestrator",
+        "Clients - Duratii",
         &format!(
             r#"
             <header class="dashboard-header">
-                <h1>AI Orchestrator</h1>
+                <div class="brand-header">
+                    <img src="/static/emblem.png" alt="" class="header-emblem">
+                    <h1>duratii</h1>
+                </div>
                 <div class="user-info">
                     <span>{}</span>
                     <a href="/auth/logout" class="btn btn-secondary">Logout</a>
@@ -752,6 +762,8 @@ fn layout(title: &str, content: &str) -> String {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{}</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="apple-touch-icon" href="/static/emblem.png">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <style>
         :root {{
@@ -785,6 +797,32 @@ fn layout(title: &str, content: &str) -> String {
             min-height: 100vh;
             padding: 2rem;
             text-align: center;
+        }}
+
+        .login-logo {{
+            margin-bottom: 1.5rem;
+        }}
+
+        .logo-emblem {{
+            width: 120px;
+            height: 120px;
+            object-fit: contain;
+            filter: drop-shadow(0 0 20px rgba(63, 185, 80, 0.3));
+        }}
+
+        .brand-title {{
+            font-size: 3rem;
+            font-weight: 300;
+            color: #7ee787;
+            margin-bottom: 0.25rem;
+            letter-spacing: 0.05em;
+        }}
+
+        .brand-tagline {{
+            font-size: 1rem;
+            color: var(--text-secondary);
+            font-style: italic;
+            margin-bottom: 1.5rem;
         }}
 
         .login-container h1 {{
@@ -844,8 +882,23 @@ fn layout(title: &str, content: &str) -> String {
             border-bottom: 1px solid var(--border);
         }}
 
+        .brand-header {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }}
+
+        .header-emblem {{
+            width: 36px;
+            height: 36px;
+            object-fit: contain;
+        }}
+
         .dashboard-header h1 {{
             font-size: 1.5rem;
+            color: #7ee787;
+            font-weight: 400;
+            letter-spacing: 0.03em;
         }}
 
         .user-info {{
@@ -1434,6 +1487,24 @@ fn layout(title: &str, content: &str) -> String {
         }}
 
         @media (max-width: 480px) {{
+            .logo-emblem {{
+                width: 80px;
+                height: 80px;
+            }}
+
+            .brand-title {{
+                font-size: 2.25rem;
+            }}
+
+            .brand-tagline {{
+                font-size: 0.875rem;
+            }}
+
+            .header-emblem {{
+                width: 28px;
+                height: 28px;
+            }}
+
             .login-container h1 {{
                 font-size: 2rem;
             }}
