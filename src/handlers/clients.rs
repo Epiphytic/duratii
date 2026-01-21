@@ -134,12 +134,22 @@ pub async fn get_client_ws_info(req: Request, ctx: RouteContext<()>) -> Result<R
                     "status": c.metadata.status.to_string(),
                 });
 
-                Response::from_json(&response_json)
+                let mut response = Response::from_json(&response_json)?;
+                let headers = response.headers_mut();
+                headers.set("Cache-Control", "no-store, no-cache, must-revalidate")?;
+                headers.set("Pragma", "no-cache")?;
+                headers.set("Expires", "0")?;
+                Ok(response)
             } else {
-                Response::from_json(&serde_json::json!({
+                let mut response = Response::from_json(&serde_json::json!({
                     "error": "Client does not have a callback URL configured",
                     "client_id": c.id,
-                }))
+                }))?;
+                let headers = response.headers_mut();
+                headers.set("Cache-Control", "no-store, no-cache, must-revalidate")?;
+                headers.set("Pragma", "no-cache")?;
+                headers.set("Expires", "0")?;
+                Ok(response)
             }
         }
         None => Response::error("Client not found", 404),
