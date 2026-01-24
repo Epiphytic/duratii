@@ -77,7 +77,7 @@ pub enum PendingWsMessage {
     Ping { pending_id: String },
     Pong { pending_id: String },
     /// Token granted (to claudecodeui) - authorization successful
-    TokenGranted { token: String, client_id: String },
+    TokenGranted { pending_id: String, token: String, client_id: String },
     /// Authorization denied
     AuthorizationDenied { reason: String },
     /// Authorization timeout (10 minutes expired)
@@ -417,6 +417,7 @@ impl PendingHub {
 
         // Send the token to the pending client over WebSocket
         let token_granted = PendingWsMessage::TokenGranted {
+            pending_id: pending_id.to_string(),
             token: full_token.clone(),
             client_id: client_id.clone(),
         };
