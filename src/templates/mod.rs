@@ -411,29 +411,6 @@ function rejectPendingClient(pendingId) {
     showNotification('Client will timeout if not authorized within 10 minutes');
 }
 
-// Update pending section visibility
-function updatePendingSection() {
-    const pendingList = document.getElementById('pending-list');
-    const pendingSection = document.getElementById('pending-section');
-    if (pendingList && pendingSection) {
-        const isEmpty = pendingList.children.length === 0 || pendingList.innerHTML.trim() === '';
-        pendingSection.style.display = isEmpty ? 'none' : 'block';
-    }
-}
-
-// Hide pending section initially (will be shown if there are pending clients)
-document.addEventListener('DOMContentLoaded', function() {
-    const pendingSection = document.getElementById('pending-section');
-    if (pendingSection) pendingSection.style.display = 'none';
-});
-
-// Update pending section after HTMX swaps
-document.body.addEventListener('htmx:afterSwap', function(event) {
-    if (event.detail.target.id === 'pending-list') {
-        updatePendingSection();
-    }
-});
-
 connectWebSocket();
 </script>"#;
 
@@ -486,15 +463,23 @@ pub fn render_client_list(clients: &[Client]) -> String {
 /// Render the pending clients list (HTMX partial)
 pub fn render_pending_list(clients: &[PendingClientInfo]) -> String {
     if clients.is_empty() {
-        // Return empty - the section will be hidden via JS when empty
-        return String::new();
+        return r#"
+            <div class="empty-state small">
+                <p>No clients waiting for authorization.</p>
+                <p class="hint">Clients connecting without a token will appear here.</p>
+            </div>
+            <script>
+                document.getElementById('pending-count-badge').textContent = '0';
+                document.getElementById('pending-count-badge').classList.remove('has-pending');
+            </script>
+        "#
+        .to_string();
     }
 
     let cards: Vec<String> = clients.iter().map(render_pending_card).collect();
     format!(
         r#"<div class="pending-grid">{}</div>
         <script>
-            document.getElementById('pending-section').style.display = 'block';
             document.getElementById('pending-count-badge').textContent = '{}';
             document.getElementById('pending-count-badge').classList.add('has-pending');
         </script>"#,
@@ -1247,7 +1232,6 @@ fn layout(title: &str, content: &str) -> String {
             margin-bottom: 2rem;
             padding-bottom: 2rem;
             border-bottom: 1px solid var(--border);
-            display: none;
         }}
 
         .pending-grid {{
