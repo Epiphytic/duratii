@@ -478,7 +478,7 @@ impl UserHub {
             .collect();
 
         let is_browser = params.get("type").map(|t| t == "browser").unwrap_or(false);
-        let client_id: Option<String> = params.get("client_id").cloned();
+        let client_id: Option<String> = params.get("client_id").cloned().filter(|s| !s.is_empty());
 
         // Extract geo info from query params (passed from Worker)
         let geo_info = GeoInfo {
@@ -496,15 +496,17 @@ impl UserHub {
         // Tags allow us to identify WebSockets after hibernation
         if is_browser {
             self.state.accept_websocket_with_tags(&server, &["browser"]);
-        } else if let Some(ref id) = client_id {
-            // Tag client WebSocket with its client_id for hibernation recovery
-            self.state.accept_websocket_with_tags(&server, &[id]);
-
-            // Store geo info for this client_id to be used when handling Register message
-            self.pending_geo_info.borrow_mut().insert(id.clone(), geo_info);
         } else {
-            // Legacy: no client_id provided (shouldn't happen with updated claudecodeui)
-            self.state.accept_web_socket(&server);
+            // Generate a temporary connection ID if client_id not provided
+            // This allows us to store geo info and retrieve it when Register message arrives
+            let conn_id = client_id.unwrap_or_else(|| generate_connection_id());
+
+            // Tag client WebSocket with its connection ID for hibernation recovery
+            self.state.accept_websocket_with_tags(&server, &[&conn_id]);
+
+            // Store geo info for this connection to be used when handling Register message
+            // We use the connection tag to look it up later
+            self.pending_geo_info.borrow_mut().insert(conn_id, geo_info);
         }
 
         Response::from_websocket(client)
@@ -545,8 +547,12 @@ impl UserHub {
                 user_token: _,
                 metadata,
             } => {
-                // Get geo info from pending map (stored when WebSocket connected)
-                let geo_info = self.pending_geo_info.borrow_mut().remove(&client_id);
+                // Get geo info from pending map - try connection tag first (from WebSocket tags)
+                // The tag might be the client_id if provided in URL, or a generated conn_id
+                let tags = self.state.get_tags(ws);
+                let geo_info = tags.first()
+                    .and_then(|tag| self.pending_geo_info.borrow_mut().remove(tag))
+                    .or_else(|| self.pending_geo_info.borrow_mut().remove(&client_id));
 
                 // Create client with geo info merged into metadata
                 let user_id = self.state.id().to_string();
@@ -1139,4 +1145,11 @@ fn generate_request_id() -> String {
     let mut bytes = [0u8; 16];
     getrandom::getrandom(&mut bytes).unwrap_or_default();
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+/// Generate a unique connection ID for WebSocket tagging
+fn generate_connection_id() -> String {
+    let mut bytes = [0u8; 8];
+    getrandom::getrandom(&mut bytes).unwrap_or_default();
+    format!("conn_{}", bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>())
 }

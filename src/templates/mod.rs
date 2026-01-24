@@ -596,6 +596,13 @@ pub fn render_client_card(client: &Client) -> String {
     };
 
     let id = escape_html(&client.id);
+    // Use hostname as the display name (more meaningful than random ID)
+    let display_name = if client.metadata.hostname.is_empty() {
+        &client.id
+    } else {
+        &client.metadata.hostname
+    };
+    let display_name = escape_html(display_name);
     let last_activity = client
         .metadata
         .last_activity
@@ -622,7 +629,7 @@ pub fn render_client_card(client: &Client) -> String {
         connect_class,
         "\" target=\"_blank\">",
         "<span class=\"client-title\">",
-        &id,
+        &display_name,
         "</span>",
         "</a>",
         "<div class=\"header-right\">",
