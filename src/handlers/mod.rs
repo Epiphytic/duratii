@@ -13,7 +13,9 @@ pub use tokens::{
     close_token_modal, create_token_api, delete_token, list_tokens, list_tokens_htmx,
     revoke_token_htmx, show_token_modal, validate_token,
 };
-pub use websocket::websocket_upgrade;
+pub use websocket::{
+    claim_pending_client, get_pending_clients, websocket_pending, websocket_upgrade,
+};
 
 use worker::*;
 

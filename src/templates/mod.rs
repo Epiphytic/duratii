@@ -1,4 +1,4 @@
-use crate::models::{Client, ClientStatus, TokenInfo, User};
+use crate::models::{Client, ClientStatus, PendingClientInfo, TokenInfo, User};
 
 /// Render the home/login page
 pub fn render_home() -> String {
@@ -36,6 +36,16 @@ pub fn render_dashboard(user: &User) -> String {
         "<a href=\"/auth/logout\" class=\"btn btn-secondary\">Logout</a>",
         "</div></header>",
         "<main class=\"dashboard-main\">",
+        // Pending authorization section
+        "<section class=\"pending-section\" id=\"pending-section\">",
+        "<div class=\"section-header\">",
+        "<h2>Pending Authorization</h2>",
+        "<span id=\"pending-count-badge\" class=\"count-badge\">0</span>",
+        "</div>",
+        "<p class=\"section-desc\">Clients waiting for you to authorize their connection.</p>",
+        "<div id=\"pending-list\" hx-get=\"/api/pending\" hx-trigger=\"load, every 10s\" hx-swap=\"innerHTML\">",
+        "</div></section>",
+        // Connected clients section
         "<section class=\"clients-section\">",
         "<div class=\"section-header\">",
         "<h2>Connected Clients</h2>",
@@ -370,6 +380,60 @@ function showNotification(message) {
     }, 3000);
 }
 
+// Pending client authorization functions
+function claimPendingClient(pendingId) {
+    const name = prompt('Enter a name for this client token:', 'CLI ' + new Date().toLocaleDateString());
+    if (!name) return;
+
+    fetch('/api/pending/' + encodeURIComponent(pendingId) + '/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name })
+    })
+    .then(response => {
+        if (response.ok) {
+            showNotification('Client authorized successfully');
+            // Refresh the pending list
+            htmx.trigger('#pending-list', 'load');
+            // Refresh connected clients list after a short delay (client needs time to reconnect)
+            setTimeout(() => htmx.trigger('#clients-list', 'load'), 2000);
+        } else {
+            response.text().then(text => showNotification('Failed to authorize: ' + text));
+        }
+    })
+    .catch(err => showNotification('Error: ' + err.message));
+}
+
+function rejectPendingClient(pendingId) {
+    if (!confirm('Reject this client? They will be disconnected.')) return;
+
+    // For now, we just let them timeout. A future enhancement could add a reject endpoint.
+    showNotification('Client will timeout if not authorized within 10 minutes');
+}
+
+// Update pending section visibility
+function updatePendingSection() {
+    const pendingList = document.getElementById('pending-list');
+    const pendingSection = document.getElementById('pending-section');
+    if (pendingList && pendingSection) {
+        const isEmpty = pendingList.children.length === 0 || pendingList.innerHTML.trim() === '';
+        pendingSection.style.display = isEmpty ? 'none' : 'block';
+    }
+}
+
+// Hide pending section initially (will be shown if there are pending clients)
+document.addEventListener('DOMContentLoaded', function() {
+    const pendingSection = document.getElementById('pending-section');
+    if (pendingSection) pendingSection.style.display = 'none';
+});
+
+// Update pending section after HTMX swaps
+document.body.addEventListener('htmx:afterSwap', function(event) {
+    if (event.detail.target.id === 'pending-list') {
+        updatePendingSection();
+    }
+});
+
 connectWebSocket();
 </script>"#;
 
@@ -417,6 +481,124 @@ pub fn render_client_list(clients: &[Client]) -> String {
 
     let cards: Vec<String> = clients.iter().map(render_client_card).collect();
     format!(r#"<div class="clients-grid">{}</div>"#, cards.join("\n"))
+}
+
+/// Render the pending clients list (HTMX partial)
+pub fn render_pending_list(clients: &[PendingClientInfo]) -> String {
+    if clients.is_empty() {
+        // Return empty - the section will be hidden via JS when empty
+        return String::new();
+    }
+
+    let cards: Vec<String> = clients.iter().map(render_pending_card).collect();
+    format!(
+        r#"<div class="pending-grid">{}</div>
+        <script>
+            document.getElementById('pending-section').style.display = 'block';
+            document.getElementById('pending-count-badge').textContent = '{}';
+            document.getElementById('pending-count-badge').classList.add('has-pending');
+        </script>"#,
+        cards.join("\n"),
+        clients.len()
+    )
+}
+
+/// Render a single pending client card
+pub fn render_pending_card(client: &PendingClientInfo) -> String {
+    let pending_id = escape_html(&client.pending_id);
+    let hostname = if client.hostname.is_empty() {
+        "Waiting for registration..."
+    } else {
+        &client.hostname
+    };
+    let hostname = escape_html(hostname);
+    let project = if client.project.is_empty() {
+        "-"
+    } else {
+        &client.project
+    };
+    let project = escape_html(project);
+    let platform = if client.platform.is_empty() {
+        "-"
+    } else {
+        &client.platform
+    };
+    let platform = escape_html(platform);
+
+    // Format location info
+    let location = format_location(&client.city, &client.region, &client.country);
+    let ip_address = client.ip_address.as_deref().unwrap_or("-");
+
+    // Format claim patterns
+    let claim_patterns = format_claim_patterns(
+        &client.allowed_users,
+        &client.allowed_orgs,
+        &client.allowed_teams,
+    );
+
+    [
+        "<div class=\"pending-card\" id=\"pending-",
+        &pending_id,
+        "\">",
+        "<div class=\"pending-header\">",
+        "<span class=\"pending-title\">",
+        &hostname,
+        "</span>",
+        "<span class=\"status-badge status-pending\">pending</span>",
+        "</div>",
+        "<div class=\"pending-body\">",
+        "<div class=\"pending-details\">",
+        "<div class=\"detail-row\"><span class=\"detail-label\">Project</span>",
+        "<span class=\"detail-value mono\">",
+        &project,
+        "</span></div>",
+        "<div class=\"detail-row\"><span class=\"detail-label\">Platform</span>",
+        "<span class=\"detail-value\">",
+        &platform,
+        "</span></div>",
+        "<div class=\"detail-row\"><span class=\"detail-label\">IP Address</span>",
+        "<span class=\"detail-value mono\">",
+        ip_address,
+        "</span></div>",
+        "<div class=\"detail-row\"><span class=\"detail-label\">Location</span>",
+        "<span class=\"detail-value\">",
+        &location,
+        "</span></div>",
+        "<div class=\"detail-row\"><span class=\"detail-label\">Can Claim</span>",
+        "<span class=\"detail-value claim-patterns\">",
+        &claim_patterns,
+        "</span></div>",
+        "</div>",
+        "<div class=\"pending-actions\">",
+        "<button class=\"btn btn-primary btn-sm\" onclick=\"claimPendingClient('",
+        &pending_id,
+        "')\">Authorize</button>",
+        "<button class=\"btn btn-danger btn-sm\" onclick=\"rejectPendingClient('",
+        &pending_id,
+        "')\">Reject</button>",
+        "</div>",
+        "</div></div>",
+    ]
+    .concat()
+}
+
+/// Format claim patterns for display
+fn format_claim_patterns(users: &[String], orgs: &[String], teams: &[String]) -> String {
+    let mut parts = Vec::new();
+    for user in users {
+        parts.push(format!("@{}", escape_html(user)));
+    }
+    for org in orgs {
+        parts.push(format!("org:{}", escape_html(org)));
+    }
+    for team in teams {
+        parts.push(format!("team:{}", escape_html(team)));
+    }
+    if parts.is_empty() {
+        "-".to_string()
+    } else {
+        parts.join(", ")
+    }
 }
 
 /// Render a single client card (collapsed view)
@@ -507,6 +689,15 @@ pub fn render_client_details(client: &Client) -> String {
     let status = client.metadata.status.to_string();
     let connect_class = if is_connected { "clickable" } else { "" };
 
+    // Format location info
+    let location = format_location(
+        &client.metadata.city,
+        &client.metadata.region,
+        &client.metadata.country,
+    );
+    let ip_address = client.metadata.ip_address.as_deref().unwrap_or("-");
+    let platform = client.metadata.platform.as_deref().unwrap_or("-");
+
     let disconnect_btn = if is_connected {
         [
             "<button class=\"btn btn-danger btn-sm\" hx-post=\"/clients/",
@@ -578,6 +769,18 @@ pub fn render_client_details(client: &Client) -> String {
         "<div class=\"detail-row\"><span class=\"detail-label\">Project</span>",
         "<span class=\"detail-value mono\">",
         &project,
+        "</span></div>",
+        "<div class=\"detail-row\"><span class=\"detail-label\">Platform</span>",
+        "<span class=\"detail-value\">",
+        platform,
+        "</span></div>",
+        "<div class=\"detail-row\"><span class=\"detail-label\">IP Address</span>",
+        "<span class=\"detail-value mono\">",
+        ip_address,
+        "</span></div>",
+        "<div class=\"detail-row\"><span class=\"detail-label\">Location</span>",
+        "<span class=\"detail-value\">",
+        &location,
         "</span></div>",
         "<div class=\"detail-row\"><span class=\"detail-label\">Connected</span>",
         "<span class=\"detail-value\">",
@@ -1037,6 +1240,70 @@ fn layout(title: &str, content: &str) -> String {
         .status-active {{ background: rgba(63, 185, 80, 0.2); color: var(--success); }}
         .status-busy {{ background: rgba(210, 153, 34, 0.2); color: var(--warning); }}
         .status-disconnected {{ background: rgba(248, 81, 73, 0.2); color: var(--error); }}
+        .status-pending {{ background: rgba(88, 166, 255, 0.2); color: var(--accent); }}
+
+        /* Pending section styles */
+        .pending-section {{
+            margin-bottom: 2rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+            display: none;
+        }}
+
+        .pending-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+        }}
+
+        .pending-card {{
+            background: var(--bg-secondary);
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            overflow: hidden;
+        }}
+
+        .pending-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: rgba(88, 166, 255, 0.1);
+            border-bottom: 1px solid var(--border);
+        }}
+
+        .pending-title {{
+            font-weight: 600;
+            color: var(--text-primary);
+        }}
+
+        .pending-body {{
+            padding: 1rem;
+        }}
+
+        .pending-details {{
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }}
+
+        .pending-actions {{
+            display: flex;
+            gap: 0.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }}
+
+        .claim-patterns {{
+            font-size: 0.75rem;
+            color: var(--accent);
+        }}
+
+        .count-badge.has-pending {{
+            background: rgba(88, 166, 255, 0.2);
+            color: var(--accent);
+        }}
 
         .client-body {{
             padding: 1rem;
@@ -1724,6 +1991,23 @@ fn format_timestamp(ts: &str) -> String {
     // For now, just return the timestamp as-is
     // In production, you'd format this nicely
     ts.to_string()
+}
+
+/// Format location from city, region, and country
+fn format_location(
+    city: &Option<String>,
+    region: &Option<String>,
+    country: &Option<String>,
+) -> String {
+    let parts: Vec<&str> = [city.as_deref(), region.as_deref(), country.as_deref()]
+        .into_iter()
+        .flatten()
+        .collect();
+    if parts.is_empty() {
+        "-".to_string()
+    } else {
+        parts.join(", ")
+    }
 }
 
 /// Format timestamp as relative time (e.g., "2 minutes ago")

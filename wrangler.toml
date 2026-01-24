@@ -7,11 +7,18 @@ command = "cargo install -q worker-build && worker-build --release"
 
 # Durable Objects configuration
 [durable_objects]
-bindings = [{ name = "USER_HUB", class_name = "UserHub" }]
+bindings = [
+  { name = "USER_HUB", class_name = "UserHub" },
+  { name = "PENDING_HUB", class_name = "PendingHub" },
+]
 
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["UserHub"]
+
+[[migrations]]
+tag = "v2"
+new_classes = ["PendingHub"]
 
 # D1 Database binding (development)
 # Note: Using existing database, can be renamed later if needed
@@ -47,11 +54,18 @@ ENVIRONMENT = "development"
 name = "duratii-prod"
 
 [env.production.durable_objects]
-bindings = [{ name = "USER_HUB", class_name = "UserHub" }]
+bindings = [
+  { name = "USER_HUB", class_name = "UserHub" },
+  { name = "PENDING_HUB", class_name = "PendingHub" },
+]
 
 [[env.production.migrations]]
 tag = "v1"
 new_sqlite_classes = ["UserHub"]
+
+[[env.production.migrations]]
+tag = "v2"
+new_classes = ["PendingHub"]
 
 [env.production.vars]
 GITHUB_CLIENT_ID = "Ov23liCmLw4EzqdaoEXD"

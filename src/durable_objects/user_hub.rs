@@ -19,6 +19,11 @@ struct ClientRow {
     connected_at: String,
     last_seen: String,
     callback_url: Option<String>,
+    ip_address: Option<String>,
+    country: Option<String>,
+    city: Option<String>,
+    region: Option<String>,
+    platform: Option<String>,
 }
 
 /// HTTP proxy request from the Worker
@@ -154,6 +159,15 @@ struct PendingRequest {
     browser_ws: WebSocket,
 }
 
+/// Geo info extracted from Cloudflare headers
+#[derive(Clone, Default)]
+struct GeoInfo {
+    ip_address: Option<String>,
+    country: Option<String>,
+    city: Option<String>,
+    region: Option<String>,
+}
+
 /// Per-user Durable Object that manages connected claudecodeui instances
 #[durable_object]
 pub struct UserHub {
@@ -169,6 +183,8 @@ pub struct UserHub {
     pending_requests: RefCell<HashMap<String, PendingRequest>>,
     /// Pending HTTP proxy requests: request_id -> oneshot sender for response
     pending_proxy_requests: RefCell<HashMap<String, oneshot::Sender<ProxyResponse>>>,
+    /// Geo info for WebSockets that haven't registered yet (keyed by client_id)
+    pending_geo_info: RefCell<HashMap<String, GeoInfo>>,
 }
 
 impl DurableObject for UserHub {
@@ -181,6 +197,7 @@ impl DurableObject for UserHub {
             initialized: RefCell::new(false),
             pending_proxy_requests: RefCell::new(HashMap::new()),
             pending_requests: RefCell::new(HashMap::new()),
+            pending_geo_info: RefCell::new(HashMap::new()),
         }
     }
 
@@ -276,16 +293,23 @@ impl UserHub {
                 last_activity TEXT,
                 connected_at TEXT NOT NULL,
                 last_seen TEXT NOT NULL,
-                callback_url TEXT
+                callback_url TEXT,
+                ip_address TEXT,
+                country TEXT,
+                city TEXT,
+                region TEXT,
+                platform TEXT
             )",
             None,
         )?;
 
-        // Migration: Add callback_url column if it doesn't exist (ignore error if already exists)
-        let _ = sql.exec(
-            "ALTER TABLE clients ADD COLUMN callback_url TEXT",
-            None,
-        );
+        // Migrations: Add columns if they don't exist (ignore error if already exists)
+        let _ = sql.exec("ALTER TABLE clients ADD COLUMN callback_url TEXT", None);
+        let _ = sql.exec("ALTER TABLE clients ADD COLUMN ip_address TEXT", None);
+        let _ = sql.exec("ALTER TABLE clients ADD COLUMN country TEXT", None);
+        let _ = sql.exec("ALTER TABLE clients ADD COLUMN city TEXT", None);
+        let _ = sql.exec("ALTER TABLE clients ADD COLUMN region TEXT", None);
+        let _ = sql.exec("ALTER TABLE clients ADD COLUMN platform TEXT", None);
 
         *self.initialized.borrow_mut() = true;
         Ok(())
@@ -297,8 +321,8 @@ impl UserHub {
         let sql = self.state.storage().sql();
 
         sql.exec(
-            "INSERT OR REPLACE INTO clients (client_id, user_id, hostname, project, status, last_activity, connected_at, last_seen, callback_url)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO clients (client_id, user_id, hostname, project, status, last_activity, connected_at, last_seen, callback_url, ip_address, country, city, region, platform)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             Some(vec![
                 SqlStorageValue::String(client.id.clone()),
                 SqlStorageValue::String(client.user_id.clone()),
@@ -309,6 +333,11 @@ impl UserHub {
                 SqlStorageValue::String(client.connected_at.clone()),
                 SqlStorageValue::String(client.last_seen.clone()),
                 client.metadata.callback_url.clone().map(SqlStorageValue::String).unwrap_or(SqlStorageValue::Null),
+                client.metadata.ip_address.clone().map(SqlStorageValue::String).unwrap_or(SqlStorageValue::Null),
+                client.metadata.country.clone().map(SqlStorageValue::String).unwrap_or(SqlStorageValue::Null),
+                client.metadata.city.clone().map(SqlStorageValue::String).unwrap_or(SqlStorageValue::Null),
+                client.metadata.region.clone().map(SqlStorageValue::String).unwrap_or(SqlStorageValue::Null),
+                client.metadata.platform.clone().map(SqlStorageValue::String).unwrap_or(SqlStorageValue::Null),
             ]),
         )?;
 
@@ -359,7 +388,7 @@ impl UserHub {
         let sql = self.state.storage().sql();
 
         let cursor = sql.exec(
-            "SELECT client_id, user_id, hostname, project, status, last_activity, connected_at, last_seen, callback_url FROM clients",
+            "SELECT client_id, user_id, hostname, project, status, last_activity, connected_at, last_seen, callback_url, ip_address, country, city, region, platform FROM clients",
             None,
         )?;
 
@@ -384,6 +413,11 @@ impl UserHub {
                     status,
                     last_activity: row_value.last_activity,
                     callback_url: row_value.callback_url,
+                    ip_address: row_value.ip_address,
+                    country: row_value.country,
+                    city: row_value.city,
+                    region: row_value.region,
+                    platform: row_value.platform,
                 },
                 connected_at: row_value.connected_at,
                 last_seen: row_value.last_seen,
@@ -438,11 +472,21 @@ impl UserHub {
 
         // Parse query parameters
         let url = req.url()?;
-        let is_browser = url.query_pairs().any(|(k, v)| k == "type" && v == "browser");
-        let client_id: Option<String> = url
+        let params: HashMap<String, String> = url
             .query_pairs()
-            .find(|(k, _)| k == "client_id")
-            .map(|(_, v)| v.to_string());
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+
+        let is_browser = params.get("type").map(|t| t == "browser").unwrap_or(false);
+        let client_id: Option<String> = params.get("client_id").cloned();
+
+        // Extract geo info from query params (passed from Worker)
+        let geo_info = GeoInfo {
+            ip_address: params.get("ip").cloned(),
+            country: params.get("country").cloned(),
+            city: params.get("city").cloned(),
+            region: params.get("region").cloned(),
+        };
 
         let pair = WebSocketPair::new()?;
         let server = pair.server;
@@ -452,9 +496,12 @@ impl UserHub {
         // Tags allow us to identify WebSockets after hibernation
         if is_browser {
             self.state.accept_websocket_with_tags(&server, &["browser"]);
-        } else if let Some(id) = client_id {
+        } else if let Some(ref id) = client_id {
             // Tag client WebSocket with its client_id for hibernation recovery
-            self.state.accept_websocket_with_tags(&server, &[&id]);
+            self.state.accept_websocket_with_tags(&server, &[id]);
+
+            // Store geo info for this client_id to be used when handling Register message
+            self.pending_geo_info.borrow_mut().insert(id.clone(), geo_info);
         } else {
             // Legacy: no client_id provided (shouldn't happen with updated claudecodeui)
             self.state.accept_web_socket(&server);
@@ -498,9 +545,28 @@ impl UserHub {
                 user_token: _,
                 metadata,
             } => {
-                // Create client
+                // Get geo info from pending map (stored when WebSocket connected)
+                let geo_info = self.pending_geo_info.borrow_mut().remove(&client_id);
+
+                // Create client with geo info merged into metadata
                 let user_id = self.state.id().to_string();
-                let client = Client::new(client_id.clone(), user_id, metadata);
+                let mut metadata_with_geo = metadata;
+                if let Some(geo) = geo_info {
+                    // Only set geo fields if not already provided by client
+                    if metadata_with_geo.ip_address.is_none() {
+                        metadata_with_geo.ip_address = geo.ip_address;
+                    }
+                    if metadata_with_geo.country.is_none() {
+                        metadata_with_geo.country = geo.country;
+                    }
+                    if metadata_with_geo.city.is_none() {
+                        metadata_with_geo.city = geo.city;
+                    }
+                    if metadata_with_geo.region.is_none() {
+                        metadata_with_geo.region = geo.region;
+                    }
+                }
+                let client = Client::new(client_id.clone(), user_id, metadata_with_geo);
 
                 // Save to SQLite for persistence
                 let _ = self.save_client(&client);

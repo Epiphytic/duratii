@@ -36,6 +36,21 @@ pub struct ClientMetadata {
     /// Optional HTTP callback URL for direct proxying (e.g., http://localhost:3010 or https://tunnel.ngrok.io)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub callback_url: Option<String>,
+    /// Client's IP address (from CF-Connecting-IP header)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ip_address: Option<String>,
+    /// Client's country (from CF-IPCountry header)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+    /// Client's city (from CF-IPCity header)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub city: Option<String>,
+    /// Client's region (from CF-Region header)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+    /// Client's platform (e.g., darwin, linux, win32)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platform: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

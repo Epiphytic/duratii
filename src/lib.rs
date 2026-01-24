@@ -6,6 +6,7 @@ mod handlers;
 mod models;
 mod templates;
 
+pub use durable_objects::PendingHub;
 pub use durable_objects::UserHub;
 
 #[event(fetch)]
@@ -39,6 +40,11 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .get_async("/tokens/close-modal", handlers::close_token_modal)
         // WebSocket upgrade for claudecodeui connections
         .get_async("/ws/connect", handlers::websocket_upgrade)
+        // WebSocket for pending (unauthenticated) clients
+        .get_async("/ws/pending", handlers::websocket_pending)
+        // API for pending clients
+        .get_async("/api/pending", handlers::get_pending_clients)
+        .post_async("/api/pending/:id/claim", handlers::claim_pending_client)
         // HTTP proxy to claudecodeui instances
         // Root path proxy (no trailing slash)
         .get_async("/clients/:id/proxy", handlers::proxy_to_client)
