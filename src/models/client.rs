@@ -26,12 +26,15 @@ impl std::fmt::Display for ClientStatus {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ClientMetadata {
+    #[serde(default)]
     pub hostname: String,
+    #[serde(default)]
     pub project: String,
     #[serde(default)]
     pub status: ClientStatus,
+    #[serde(default)]
     pub last_activity: Option<String>,
     /// Optional HTTP callback URL for direct proxying (e.g., http://localhost:3010 or https://tunnel.ngrok.io)
     #[serde(default, skip_serializing_if = "Option::is_none")]

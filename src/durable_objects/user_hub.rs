@@ -50,8 +50,11 @@ pub struct ProxyResponse {
 pub enum WsMessage {
     /// Client registration from claudecodeui
     Register {
+        #[serde(default)]
         client_id: String,
+        #[serde(default)]
         user_token: String,
+        #[serde(default)]
         metadata: ClientMetadata,
     },
     /// Registration response
