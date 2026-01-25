@@ -381,8 +381,8 @@ function showNotification(message) {
 }
 
 // Pending client authorization functions
-function claimPendingClient(pendingId) {
-    const name = prompt('Enter a name for this client token:', 'CLI ' + new Date().toLocaleDateString());
+function claimPendingClient(pendingId, defaultName) {
+    const name = prompt('Enter a name for this client token:', defaultName || 'CLI ' + new Date().toLocaleDateString());
     if (!name) return;
 
     fetch('/api/pending/' + encodeURIComponent(pendingId) + '/claim', {
@@ -491,12 +491,14 @@ pub fn render_pending_list(clients: &[PendingClientInfo]) -> String {
 /// Render a single pending client card
 pub fn render_pending_card(client: &PendingClientInfo) -> String {
     let pending_id = escape_html(&client.pending_id);
-    let hostname = if client.hostname.is_empty() {
+    let hostname_raw = if client.hostname.is_empty() {
         "Waiting for registration..."
     } else {
         &client.hostname
     };
-    let hostname = escape_html(hostname);
+    let hostname = escape_html(hostname_raw);
+    // JS-escaped version for onclick handler
+    let hostname_js = escape_js_string(hostname_raw);
     let project = if client.project.is_empty() {
         "-"
     } else {
@@ -557,6 +559,8 @@ pub fn render_pending_card(client: &PendingClientInfo) -> String {
         "<div class=\"pending-actions\">",
         "<button class=\"btn btn-primary btn-sm\" onclick=\"claimPendingClient('",
         &pending_id,
+        "', '",
+        &hostname_js,
         "')\">Authorize</button>",
         "<button class=\"btn btn-danger btn-sm\" onclick=\"rejectPendingClient('",
         &pending_id,
@@ -1975,6 +1979,15 @@ fn escape_html(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&#39;")
+}
+
+/// Escape string for use in JavaScript string literals (inside onclick handlers)
+fn escape_js_string(s: &str) -> String {
+    s.replace('\\', "\\\\")
+        .replace('\'', "\\'")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
 }
 
 /// Format a timestamp for display (ISO string to human-readable)
