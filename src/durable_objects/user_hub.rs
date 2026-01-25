@@ -60,8 +60,9 @@ pub enum WsMessage {
     /// Registration response
     Registered {
         success: bool,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        message: Option<String>,
+        /// Always include message field (empty string if no message)
+        #[serde(default)]
+        message: String,
     },
     /// Status update from client
     StatusUpdate {
@@ -592,7 +593,7 @@ impl UserHub {
                 // Send registration success response
                 let registered = WsMessage::Registered {
                     success: true,
-                    message: None,
+                    message: String::new(),
                 };
                 if let Ok(json) = serde_json::to_string(&registered) {
                     let _ = ws.send_with_str(&json);
