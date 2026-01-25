@@ -1,11 +1,20 @@
 use futures::channel::oneshot;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use wasm_bindgen::JsValue;
 use worker::{SqlStorageValue, *};
 
 use crate::models::{Client, ClientMetadata, ClientStatus};
+
+/// Custom deserializer that treats null as empty string
+fn null_to_empty_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt = Option::<String>::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_default())
+}
 
 /// Row structure for deserializing SQLite client rows
 #[derive(Debug, Deserialize)]
@@ -50,9 +59,9 @@ pub struct ProxyResponse {
 pub enum WsMessage {
     /// Client registration from claudecodeui
     Register {
-        #[serde(default)]
+        #[serde(default, deserialize_with = "null_to_empty_string")]
         client_id: String,
-        #[serde(default)]
+        #[serde(default, deserialize_with = "null_to_empty_string")]
         user_token: String,
         #[serde(default)]
         metadata: ClientMetadata,

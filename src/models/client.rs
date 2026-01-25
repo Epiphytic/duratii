@@ -1,4 +1,13 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+/// Custom deserializer that treats null as empty string
+fn null_to_empty_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt = Option::<String>::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_default())
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -28,9 +37,9 @@ impl std::fmt::Display for ClientStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ClientMetadata {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_empty_string")]
     pub hostname: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_empty_string")]
     pub project: String,
     #[serde(default)]
     pub status: ClientStatus,
