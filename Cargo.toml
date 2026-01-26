@@ -1,8 +1,8 @@
 [package]
-name = "ai-orchestrator"
+name = "duratii"
 version = "0.1.0"
 edition = "2021"
-authors = ["AI Orchestrator Team"]
+authors = ["Epiphytic"]
 description = "A lightweight orchestrator for managing multiple Claude Code instances"
 
 [lib]
@@ -18,6 +18,7 @@ console_error_panic_hook = "0.1"
 getrandom = { version = "0.2", features = ["js"] }
 futures = "0.3"
 js-sys = "0.3"
+urlencoding = "2.1"
 
 [profile.release]
 opt-level = "s"

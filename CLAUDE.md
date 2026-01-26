@@ -179,7 +179,7 @@ ws.send(
 ### File Structure (Implemented)
 
 ```
-ai-orchestrator/
+duratii/
 ├── Cargo.toml                      # Rust dependencies (worker-rs 0.7)
 ├── wrangler.toml                   # Cloudflare Workers configuration
 ├── schema.sql                      # D1 database schema
@@ -236,7 +236,7 @@ ai-orchestrator/
 ```jsonc
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "ai-orchestrator",
+  "name": "duratii",
   "main": "build/worker/shim.mjs",
   "compatibility_date": "2026-01-01",
 

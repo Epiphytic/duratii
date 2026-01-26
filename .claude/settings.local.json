@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "Bash(git clone:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd Cloudflare skills for Claude Code\n\nImport skills from github.com/cloudflare/skills including:\n- agents-sdk: Stateful AI agents development\n- durable-objects: Stateful coordination patterns\n- wrangler: Cloudflare Workers deployment\n- web-perf: Web performance auditing\n- building-mcp-server-on-cloudflare: MCP server development\n- building-ai-agent-on-cloudflare: AI agent construction\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)"
+    ]
+  }
+}

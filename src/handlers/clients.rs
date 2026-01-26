@@ -91,6 +91,71 @@ pub async fn get_client_details(req: Request, ctx: RouteContext<()>) -> Result<R
     }
 }
 
+/// Get WebSocket connection info for a client (for direct WebSocket connection)
+/// Returns the callback URL converted to WebSocket URL so frontend can connect directly
+pub async fn get_client_ws_info(req: Request, ctx: RouteContext<()>) -> Result<Response> {
+    // Check authentication
+    let user = match AuthMiddleware::require_auth(&req, &ctx.env).await? {
+        Ok(user) => user,
+        Err(_) => return Response::error("Unauthorized", 401),
+    };
+
+    let client_id = ctx.param("id").ok_or("Missing client ID")?;
+
+    // Get the user's Durable Object
+    let namespace = ctx.env.durable_object("USER_HUB")?;
+    let id = namespace.id_from_name(&user.id)?;
+    let stub = id.get_stub()?;
+
+    // Fetch clients from DO
+    let do_req = Request::new("https://do/clients", Method::Get)?;
+    let mut response = stub.fetch_with_request(do_req).await?;
+
+    let clients: Vec<Client> = response.json().await.unwrap_or_default();
+    let client = clients.into_iter().find(|c| &c.id == client_id);
+
+    match client {
+        Some(c) => {
+            // Get the callback URL and convert to WebSocket URL
+            if let Some(callback_url) = &c.metadata.callback_url {
+                // Convert http(s):// to ws(s)://
+                let ws_base = callback_url
+                    .replace("https://", "wss://")
+                    .replace("http://", "ws://");
+
+                // Check if it's a localhost URL (not publicly accessible)
+                let is_local = callback_url.contains("localhost") || callback_url.contains("127.0.0.1");
+
+                let response_json = serde_json::json!({
+                    "client_id": c.id,
+                    "ws_base": ws_base,
+                    "callback_url": callback_url,
+                    "is_local": is_local,
+                    "status": c.metadata.status.to_string(),
+                });
+
+                let mut response = Response::from_json(&response_json)?;
+                let headers = response.headers_mut();
+                headers.set("Cache-Control", "no-store, no-cache, must-revalidate")?;
+                headers.set("Pragma", "no-cache")?;
+                headers.set("Expires", "0")?;
+                Ok(response)
+            } else {
+                let mut response = Response::from_json(&serde_json::json!({
+                    "error": "Client does not have a callback URL configured",
+                    "client_id": c.id,
+                }))?;
+                let headers = response.headers_mut();
+                headers.set("Cache-Control", "no-store, no-cache, must-revalidate")?;
+                headers.set("Pragma", "no-cache")?;
+                headers.set("Expires", "0")?;
+                Ok(response)
+            }
+        }
+        None => Response::error("Client not found", 404),
+    }
+}
+
 /// Disconnect a client (sends disconnect command via WebSocket)
 pub async fn disconnect_client(req: Request, ctx: RouteContext<()>) -> Result<Response> {
     // Check authentication

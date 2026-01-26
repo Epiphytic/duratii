@@ -1,4 +1,4 @@
-name = "ai-orchestrator"
+name = "duratii"
 main = "build/worker/shim.mjs"
 compatibility_date = "2024-01-01"
 
@@ -7,19 +7,28 @@ command = "cargo install -q worker-build && worker-build --release"
 
 # Durable Objects configuration
 [durable_objects]
-bindings = [{ name = "USER_HUB", class_name = "UserHub" }]
+bindings = [
+  { name = "USER_HUB", class_name = "UserHub" },
+  { name = "PENDING_HUB", class_name = "PendingHub" },
+]
 
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["UserHub"]
 
-# D1 Database binding
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["PendingHub"]
+
+# D1 Database binding (development)
+# Note: Using existing database, can be renamed later if needed
 [[d1_databases]]
 binding = "DB"
 database_name = "orchestrator-db"
 database_id = "d50e199d-15ce-4061-813a-20d091ddc0c2"
 
-# R2 bucket for static assets
+# R2 bucket for static assets (development)
+# Note: Using existing bucket, can be renamed later if needed
 [[r2_buckets]]
 binding = "ASSETS"
 bucket_name = "orchestrator-assets"
@@ -34,18 +43,44 @@ GITHUB_CLIENT_ID = "Ov23liCmLw4EzqdaoEXD"
 ALLOWED_ORGS = ""
 ALLOWED_USERS = "liamhelmer"
 ALLOWED_TEAMS = ""
+ENVIRONMENT = "development"
 
-# Development environment
-[env.dev]
-name = "ai-orchestrator-dev"
-vars = { ENVIRONMENT = "development" }
-
-# Staging environment
-[env.staging]
-name = "ai-orchestrator-staging"
-vars = { ENVIRONMENT = "staging" }
-
+# =============================================================================
 # Production environment
+# Deploy with: wrangler deploy --env production
+# URL: https://duratii-prod.liam-helmer-428.workers.dev (or custom domain)
+# =============================================================================
 [env.production]
-name = "ai-orchestrator"
-vars = { ENVIRONMENT = "production" }
+name = "duratii-prod"
+
+[env.production.durable_objects]
+bindings = [
+  { name = "USER_HUB", class_name = "UserHub" },
+  { name = "PENDING_HUB", class_name = "PendingHub" },
+]
+
+[[env.production.migrations]]
+tag = "v1"
+new_sqlite_classes = ["UserHub"]
+
+[[env.production.migrations]]
+tag = "v2"
+new_sqlite_classes = ["PendingHub"]
+
+[env.production.vars]
+GITHUB_CLIENT_ID = "Ov23liCmLw4EzqdaoEXD"
+ALLOWED_ORGS = "epiphylic"
+ALLOWED_USERS = ""
+ALLOWED_TEAMS = ""
+ENVIRONMENT = "production"
+
+# Production D1 database (create with: wrangler d1 create duratii-db-prod)
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "duratii-db-prod"
+database_id = "17fe1c17-a87c-4e9e-9df3-79dc5df6ab97"
+
+# Production R2 bucket (create with: wrangler r2 bucket create duratii-assets-prod)
+[[env.production.r2_buckets]]
+binding = "ASSETS"
+bucket_name = "duratii-assets-prod"

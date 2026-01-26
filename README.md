@@ -1,12 +1,21 @@
-# 🌀 duratii
+<p align="center">
+  <img src="logoes/Duratii-Header.png" alt="Duratii - The Tethered Orchestrator" width="100%">
+</p>
 
-**The Tethered Orchestrator.**
+<p align="center">
+  <strong>A persistent, real-time companion that wraps around your AI engine.</strong>
+</p>
 
-> "A persistent, real-time companion that wraps around your AI engine."
+<p align="center">
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#the-anatomy">The Anatomy</a> •
+  <a href="#tech-stack">Tech Stack</a> •
+  <a href="#documentation">Docs</a>
+</p>
 
-Duratii is the mobile-first orchestration layer for your development ecosystem. It acts as the "nervous system" for the heavy lifting done by [claudecodeui](https://github.com/siteboon/claudecodeui), providing a persistent, bi-directional interface that travels with you.
+---
 
-Like _Tillandsia duratii_—which is famous for growing "prehensile" leaves that curl around branches to secure a position—this tool uses persistent connections to wrap around your compute instances, allowing you to manage complex AI workflows from a simple mobile interface.
+Duratii is the mobile-first orchestration layer for your development ecosystem. Named after _Tillandsia duratii_—an epiphytic plant famous for its prehensile leaves that curl around branches—this tool wraps around your [claudecodeui](https://github.com/siteboon/claudecodeui) instances, providing a persistent, bi-directional interface that travels with you.
 
 ## Quick Start
 
@@ -16,6 +25,10 @@ npm install -g wrangler
 
 # Set up database
 wrangler d1 execute orchestrator-db --local --file=./schema.sql
+
+# Upload static assets to R2
+wrangler r2 object put orchestrator-assets/emblem.png --file=./assets/emblem.png
+wrangler r2 object put orchestrator-assets/favicon.png --file=./assets/favicon.png
 
 # Run locally
 wrangler dev
